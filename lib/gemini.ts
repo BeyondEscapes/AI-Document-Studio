@@ -4,7 +4,7 @@ import type { DocumentContent, DocumentSection } from '@/types'
 function getClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is not set. Please add it to your .env.local file.')
+    throw new Error('GEMINI_API_KEY is not configured. Set it in .env.local for local development or in Vercel Project Settings > Environment Variables, then restart or redeploy.')
   }
   return new GoogleGenAI({ apiKey })
 }
@@ -160,6 +160,9 @@ export async function generateDocumentContent(
       } catch (err: any) {
         lastError = err
         const status = err?.status || err?.code
+        if (status === 401 || status === 403 || (Array.isArray(err?.details) && err.details.some((detail: any) => detail?.reason === 'ACCESS_TOKEN_TYPE_UNSUPPORTED'))) {
+          throw new Error('Google rejected GEMINI_API_KEY. In Vercel, set it to the raw API key from Google AI Studio (not the GEMINI_API_KEY= assignment), enable it for the deployment environment, and redeploy.')
+        }
         const isTransient = status === 503 || status === 429 || status === 404 || err?.message?.includes('high demand')
         
         console.warn(`Model ${modelToTry} attempt ${attempt + 1} failed (status ${status}). Trying next...`)
@@ -252,7 +255,7 @@ export function checkApiKey(): { configured: boolean; error?: string } {
   if (!apiKey || apiKey.trim() === '') {
     return {
       configured: false,
-      error: 'GEMINI_API_KEY is not configured. Please add it to your .env.local file.'
+      error: 'GEMINI_API_KEY is not configured. Set it in .env.local for local development or in Vercel Project Settings > Environment Variables, then restart or redeploy.'
     }
   }
   return { configured: true }

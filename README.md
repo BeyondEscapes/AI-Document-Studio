@@ -80,8 +80,17 @@ python -m pip install python-docx lxml docx2pdf
 2. Get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
 3. Open `.env.local` and paste your key:
    ```env
-   GEMINI_API_KEY=AIzaSy...your_actual_key_here
+   GEMINI_API_KEY=your_google_ai_studio_api_key
    ```
+
+### Vercel Deployment
+
+1. In Vercel, open the project and go to **Settings > Environment Variables**.
+2. Add a variable named `GEMINI_API_KEY`. Set its value to the raw API key from [Google AI Studio](https://aistudio.google.com/app/apikey); do not include `GEMINI_API_KEY=` or quotes in the value.
+3. Select the environments where the app runs, such as **Production** and **Preview**, then save.
+4. Redeploy the project so the deployment receives the updated variable.
+
+Keep this key server-side: do not name it `NEXT_PUBLIC_GEMINI_API_KEY` and never commit it to the repository. If Google rejects the key, create a fresh Gemini API key in Google AI Studio and update the Vercel variable.
 
 ### Step 4: Run the Application
 
@@ -166,7 +175,8 @@ doc_theme/
 
 | Issue | Resolution |
 |-------|------------|
-| `GEMINI_API_KEY is not configured` | Open `.env.local` and paste your key. Restart the server (`npm run dev`). |
+| `GEMINI_API_KEY is not configured` | Locally, set it in `.env.local` and restart the server. On Vercel, add it under **Settings > Environment Variables** and redeploy. |
+| `Google rejected GEMINI_API_KEY` | Set the Vercel variable to a valid raw Gemini API key from Google AI Studio, without the `GEMINI_API_KEY=` prefix, then redeploy. |
 | `Python was not found` | Ensure Python is added to Windows PATH, or install via `winget install Python.Python.3.12`. |
 | `python-docx not installed` | Run `python -m pip install python-docx lxml docx2pdf`. |
 | `PDF conversion failed` | Ensure either LibreOffice or Microsoft Word is installed. The engine automatically detects both. |
