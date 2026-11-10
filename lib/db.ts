@@ -1,20 +1,17 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
+import { DATA_DIR, ensureDataDir } from '@/lib/storage'
 import type { Conversation, DocumentTheme, AppSettings } from '@/types'
 
-const DB_PATH = path.join(process.cwd(), 'data', 'studio.db')
+const DB_PATH = path.join(DATA_DIR, 'studio.db')
 
 let _db: Database.Database | null = null
 
 function getDb(): Database.Database {
   if (_db) return _db
   
-  // Ensure data directory exists
-  const dataDir = path.dirname(DB_PATH)
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
-  }
+  ensureDataDir()
   
   _db = new Database(DB_PATH)
   _db.pragma('journal_mode = WAL')

@@ -92,6 +92,8 @@ python -m pip install python-docx lxml docx2pdf
 
 Keep this key server-side: do not name it `NEXT_PUBLIC_GEMINI_API_KEY` and never commit it to the repository. If Google rejects the key, create a fresh Gemini API key in Google AI Studio and update the Vercel variable.
 
+Vercel deployments write runtime files under `/tmp` because the application bundle is read-only. Vercel temporary storage is not durable and may not be shared across function instances, so conversations, settings, uploaded themes, and generated downloads can be lost. Use a managed database and object storage for persistent production data.
+
 ### Step 4: Run the Application
 
 ```powershell

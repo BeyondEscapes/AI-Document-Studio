@@ -3,8 +3,9 @@ import { saveTheme } from '@/lib/db'
 import { v4 as uuidv4 } from 'uuid'
 import path from 'path'
 import fs from 'fs'
+import { DATA_DIR } from '@/lib/storage'
 
-const TEMPLATES_DIR = path.join(process.cwd(), 'data', 'templates')
+const TEMPLATES_DIR = path.join(DATA_DIR, 'templates')
 
 export async function POST(request: NextRequest) {
   try {

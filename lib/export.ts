@@ -1,16 +1,15 @@
 import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
+import { DATA_DIR } from '@/lib/storage'
 import type { DocumentContent } from '@/types'
 
 const PYTHON_DIR = path.join(process.cwd(), 'python')
-const EXPORTS_DIR = path.join(process.cwd(), 'data', 'exports')
+const EXPORTS_DIR = path.join(DATA_DIR, 'exports')
 const ASSETS_DIR = path.join(process.cwd(), 'assets')
 
 export function ensureExportsDir(): void {
-  if (!fs.existsSync(EXPORTS_DIR)) {
-    fs.mkdirSync(EXPORTS_DIR, { recursive: true })
-  }
+  fs.mkdirSync(EXPORTS_DIR, { recursive: true })
 }
 
 export function sanitizeFilename(name: string): string {
