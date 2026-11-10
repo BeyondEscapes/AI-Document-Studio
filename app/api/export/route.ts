@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocx, generatePdf, generateFilename, getExportedFile } from '@/lib/export'
-import { generateBrandedDocx } from '@/lib/docx-generator'
+import { generateBrandedDocx } from '@/lib/docx-template-generator'
 import { getTheme, getSettings } from '@/lib/db'
 import path from 'path'
 import type { DocumentContent } from '@/types'
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       const docxFilename = filename
         ? filename.replace(/\.(docx|pdf)$/, '') + '.docx'
         : generateFilename(content, 'docx')
-      const buffer = await generateBrandedDocx(content)
+      const buffer = await generateBrandedDocx(content, templatePath)
       return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {
