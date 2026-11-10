@@ -33,17 +33,68 @@ export async function POST(request: NextRequest) {
 
     const content = documentContent as DocumentContent
     if (process.env.VERCEL) {
-      if (format === 'pdf') {
-        return NextResponse.json(
-          { error: 'PDF export requires LibreOffice or Microsoft Word, which is not available in Vercel functions. Download the DOCX instead.' },
-          { status: 501 }
-        )
-      }
-
       const docxFilename = filename
         ? filename.replace(/\.(docx|pdf)$/, '') + '.docx'
         : generateFilename(content, 'docx')
       const buffer = await generateBrandedDocx(content, templatePath)
+
+      if (format === 'pdf') {
+        const converterUrl = process.env.PDF_CONVERTER_URL?.replace(/\/+$/, '')
+        const converterToken = process.env.PDF_CONVERTER_TOKEN
+        if (!converterUrl || !converterToken) {
+          return NextResponse.json(
+            { error: 'PDF conversion is not configured. Deploy the converter service and set PDF_CONVERTER_URL and PDF_CONVERTER_TOKEN in Vercel.' },
+            { status: 503 }
+          )
+        }
+
+        const formData = new FormData()
+        formData.append(
+          'document',
+          new Blob([new Uint8Array(buffer)], {
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          }),
+          docxFilename
+        )
+
+        let converterResponse: Response
+        try {
+          converterResponse = await fetch(`${converterUrl}/convert`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${converterToken}` },
+            body: formData,
+            signal: AbortSignal.timeout(55_000),
+          })
+        } catch {
+          return NextResponse.json(
+            { error: 'Could not reach the PDF converter. Check PDF_CONVERTER_URL and confirm the converter service is running.' },
+            { status: 502 }
+          )
+        }
+
+        if (!converterResponse.ok) {
+          return NextResponse.json(
+            { error: `PDF conversion failed with status ${converterResponse.status}. Check the converter service logs.` },
+            { status: 502 }
+          )
+        }
+
+        const pdfBuffer = Buffer.from(await converterResponse.arrayBuffer())
+        if (!pdfBuffer.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+          return NextResponse.json({ error: 'The PDF converter returned an invalid file.' }, { status: 502 })
+        }
+
+        const pdfFilename = docxFilename.replace(/\.docx$/i, '.pdf')
+        return new NextResponse(new Uint8Array(pdfBuffer), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${pdfFilename}"`,
+            'Content-Length': pdfBuffer.length.toString(),
+          },
+        })
+      }
+
       return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {

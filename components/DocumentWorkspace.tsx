@@ -53,11 +53,18 @@ export function DocumentWorkspace({
       })
 
       const contentType = res.headers.get('content-type') || ''
-      if (res.ok && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+      const isDocx = contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+      const isPdf = contentType.includes('application/pdf')
+      if (res.ok && (isDocx || isPdf)) {
         const blob = await res.blob()
         const contentDisposition = res.headers.get('content-disposition') || ''
-        const filename = contentDisposition.match(/filename="([^"]+)"/)?.[1] || 'BeyondEscapes_Document.docx'
-        setExportStatus(prev => ({ ...prev, docx: 'success', docxFilename: filename }))
+        const extension = isPdf ? 'pdf' : 'docx'
+        const filename = contentDisposition.match(/filename="([^"]+)"/)?.[1] || `BeyondEscapes_Document.${extension}`
+        if (isPdf) {
+          setExportStatus(prev => ({ ...prev, pdf: 'success', pdfFilename: filename }))
+        } else {
+          setExportStatus(prev => ({ ...prev, docx: 'success', docxFilename: filename }))
+        }
 
         const link = document.createElement('a')
         const downloadUrl = URL.createObjectURL(blob)
@@ -66,7 +73,7 @@ export function DocumentWorkspace({
         document.body.appendChild(link)
         link.click()
         link.remove()
-        URL.revokeObjectURL(downloadUrl)
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000)
         return
       }
 

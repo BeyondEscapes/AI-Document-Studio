@@ -94,7 +94,14 @@ Keep this key server-side: do not name it `NEXT_PUBLIC_GEMINI_API_KEY` and never
 
 Vercel deployments write runtime files under `/tmp` because the application bundle is read-only. Vercel temporary storage is not durable and may not be shared across function instances, so conversations, settings, uploaded themes, and generated downloads can be lost. Use a managed database and object storage for persistent production data.
 
-DOCX exports on Vercel are generated in JavaScript and returned directly as downloads. PDF conversion still requires LibreOffice or Microsoft Word and is not available in Vercel functions; use a separate conversion service if PDF export is required in production.
+DOCX exports on Vercel use the selected Word template and are returned directly as downloads. PDF export uses the authenticated LibreOffice service in `converter/`:
+
+1. Deploy `converter/` as a Docker web service. Set `PDF_CONVERTER_TOKEN` to a long random secret in the converter's environment.
+2. Confirm the service responds with `{"ok":true}` at `/health`.
+3. In Vercel, add `PDF_CONVERTER_URL` as the service base URL (without `/convert`) and `PDF_CONVERTER_TOKEN` with the same secret value.
+4. Redeploy the Vercel project.
+
+The converter accepts requests only with the matching bearer token and limits DOCX uploads to 25 MB. Keep the token secret and do not commit it.
 
 ### Step 4: Run the Application
 
