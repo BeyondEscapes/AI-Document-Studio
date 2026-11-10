@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocx, generatePdf, generateFilename, getExportedFile } from '@/lib/export'
+import { generateBrandedDocx } from '@/lib/docx-generator'
 import { getTheme, getSettings } from '@/lib/db'
 import path from 'path'
 import type { DocumentContent } from '@/types'
@@ -31,6 +32,28 @@ export async function POST(request: NextRequest) {
     }
 
     const content = documentContent as DocumentContent
+    if (process.env.VERCEL) {
+      if (format === 'pdf') {
+        return NextResponse.json(
+          { error: 'PDF export requires LibreOffice or Microsoft Word, which is not available in Vercel functions. Download the DOCX instead.' },
+          { status: 501 }
+        )
+      }
+
+      const docxFilename = filename
+        ? filename.replace(/\.(docx|pdf)$/, '') + '.docx'
+        : generateFilename(content, 'docx')
+      const buffer = await generateBrandedDocx(content)
+      return new NextResponse(new Uint8Array(buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Disposition': `attachment; filename="${docxFilename}"`,
+          'Content-Length': buffer.length.toString(),
+        },
+      })
+    }
+
     const docxFilename = filename 
       ? filename.replace(/\.(docx|pdf)$/, '') + '.docx'
       : generateFilename(content, 'docx')

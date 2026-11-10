@@ -94,6 +94,8 @@ Keep this key server-side: do not name it `NEXT_PUBLIC_GEMINI_API_KEY` and never
 
 Vercel deployments write runtime files under `/tmp` because the application bundle is read-only. Vercel temporary storage is not durable and may not be shared across function instances, so conversations, settings, uploaded themes, and generated downloads can be lost. Use a managed database and object storage for persistent production data.
 
+DOCX exports on Vercel are generated in JavaScript and returned directly as downloads. PDF conversion still requires LibreOffice or Microsoft Word and is not available in Vercel functions; use a separate conversion service if PDF export is required in production.
+
 ### Step 4: Run the Application
 
 ```powershell

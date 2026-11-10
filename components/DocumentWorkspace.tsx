@@ -52,6 +52,24 @@ export function DocumentWorkspace({
         }),
       })
 
+      const contentType = res.headers.get('content-type') || ''
+      if (res.ok && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+        const blob = await res.blob()
+        const contentDisposition = res.headers.get('content-disposition') || ''
+        const filename = contentDisposition.match(/filename="([^"]+)"/)?.[1] || 'BeyondEscapes_Document.docx'
+        setExportStatus(prev => ({ ...prev, docx: 'success', docxFilename: filename }))
+
+        const link = document.createElement('a')
+        const downloadUrl = URL.createObjectURL(blob)
+        link.href = downloadUrl
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(downloadUrl)
+        return
+      }
+
       const data = await res.json()
 
       if (data.success) {
