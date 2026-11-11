@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import {
   FileText, Download, X, Edit3, Eye, FileDown,
   ChevronDown, ChevronUp, Trash2, Plus, AlertCircle,
-  CheckCircle, Loader2, Palette, RefreshCw, Save, BadgeCheck
+  CheckCircle, Loader2, Palette, RefreshCw, Save, BadgeCheck,
+  ImagePlus, Search, Upload,
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel, getMissingRequiredFields } from '@/lib/business-documents'
-import type { DocumentContent, DocumentSection, DocumentTheme } from '@/types'
+import { scoreItineraryImage, suggestItineraryImageMatches } from '@/lib/itinerary-images'
+import type { DocumentContent, DocumentImage, DocumentSection, DocumentTheme, ItineraryImageCatalogItem } from '@/types'
 
 interface DocumentWorkspaceProps {
   documentContent: DocumentContent | null
@@ -27,12 +29,30 @@ function resetApproval(content: DocumentContent): DocumentContent {
   return { ...content, approval: { status: 'draft' } }
 }
 
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => typeof reader.result === 'string'
+      ? resolve(reader.result)
+      : reject(new Error('Could not read the selected image.'))
+    reader.onerror = () => reject(new Error('Could not read the selected image.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 export function DocumentWorkspace({
   documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate,
   onSaveDocument, saveStatus, onClose
 }: DocumentWorkspaceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [imageCatalog, setImageCatalog] = useState<ItineraryImageCatalogItem[]>([])
+  const [imagePickerSectionId, setImagePickerSectionId] = useState<string | null>(null)
+  const [imageSearch, setImageSearch] = useState('')
+  const [imageStatus, setImageStatus] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
+  const [isMatchingImages, setIsMatchingImages] = useState(false)
+  const [uploadingImageSectionId, setUploadingImageSectionId] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<{
     docx: 'idle' | 'loading' | 'success' | 'error'
     pdf: 'idle' | 'loading' | 'success' | 'error'
@@ -41,6 +61,28 @@ export function DocumentWorkspace({
     docxFilename?: string
     pdfFilename?: string
   }>({ docx: 'idle', pdf: 'idle' })
+
+  useEffect(() => {
+    if (documentContent?.documentType !== 'tour_itinerary') {
+      setImageCatalog([])
+      setImageStatus(null)
+      setImageError(null)
+      return
+    }
+
+    let active = true
+    fetch('/api/itinerary-images')
+      .then(async response => {
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Could not load the itinerary image library.')
+        if (active) setImageCatalog(result.images as ItineraryImageCatalogItem[])
+      })
+      .catch(error => {
+        if (active) setImageError(error instanceof Error ? error.message : 'Could not load the image library.')
+      })
+
+    return () => { active = false }
+  }, [documentContent?.documentType])
 
   const handleExport = async (format: 'docx' | 'pdf') => {
     if (!documentContent) return
@@ -181,6 +223,127 @@ export function DocumentWorkspace({
     onDocumentUpdate(resetApproval({ ...documentContent, intake }))
   }, [documentContent, onDocumentUpdate])
 
+  const addImageToSection = useCallback((sectionId: string, image: DocumentImage) => {
+    if (!documentContent) return
+    const updated = resetApproval({
+      ...documentContent,
+      sections: documentContent.sections.map(section =>
+        section.id === sectionId
+          ? { ...section, images: [...(section.images ?? []), image] }
+          : section
+      ),
+    })
+    onDocumentUpdate(updated)
+  }, [documentContent, onDocumentUpdate])
+
+  const handlePickLibraryImage = async (item: ItineraryImageCatalogItem) => {
+    if (!imagePickerSectionId) return
+    setImageError(null)
+    try {
+      const response = await fetch(item.url)
+      if (!response.ok) throw new Error(`Could not load ${item.title}.`)
+      const blob = await response.blob()
+      const src = await readBlobAsDataUrl(blob)
+      addImageToSection(imagePickerSectionId, {
+        catalogId: item.id,
+        src,
+        altText: item.title,
+        caption: item.title,
+        width: item.width,
+        height: item.height,
+      })
+      setImagePickerSectionId(null)
+      setImageSearch('')
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'Could not add that image.')
+    }
+  }
+
+  const handleUploadImage = async (sectionId: string, file: File) => {
+    setUploadingImageSectionId(sectionId)
+    setImageError(null)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const response = await fetch('/api/itinerary-images', { method: 'POST', body: formData })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Image upload failed.')
+
+      const item = result.image as ItineraryImageCatalogItem
+      const imageResponse = await fetch(item.url)
+      if (!imageResponse.ok) throw new Error(`Uploaded ${item.title}, but could not read it back.`)
+      const src = await readBlobAsDataUrl(await imageResponse.blob())
+      setImageCatalog(current => [item, ...current.filter(image => image.id !== item.id)])
+      addImageToSection(sectionId, {
+        catalogId: item.id,
+        src,
+        altText: item.title,
+        caption: item.title,
+        width: item.width,
+        height: item.height,
+      })
+      setImageStatus(`Added “${item.title}” to the itinerary.`)
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'Image upload failed.')
+    } finally {
+      setUploadingImageSectionId(null)
+    }
+  }
+
+  const handleRemoveImage = useCallback((sectionId: string, imageIndex: number) => {
+    if (!documentContent) return
+    onDocumentUpdate(resetApproval({
+      ...documentContent,
+      sections: documentContent.sections.map(section => section.id === sectionId
+        ? { ...section, images: section.images?.filter((_, index) => index !== imageIndex) }
+        : section
+      ),
+    }))
+  }, [documentContent, onDocumentUpdate])
+
+  const handleAutoMatchImages = async () => {
+    if (!documentContent) return
+    setImageError(null)
+    setImageStatus(null)
+    const matches = suggestItineraryImageMatches(documentContent.sections, imageCatalog)
+    if (!matches.size) {
+      setImageStatus(imageCatalog.length
+        ? 'No confident location matches found. You can choose or upload photos for each section.'
+        : 'No image library is loaded. Import the ZIP or add photos from your device.')
+      return
+    }
+
+    setIsMatchingImages(true)
+    try {
+      const resolved = await Promise.all([...matches].map(async ([sectionId, item]) => {
+        const response = await fetch(item.url)
+        if (!response.ok) throw new Error(`Could not load the matched image “${item.title}”.`)
+        const src = await readBlobAsDataUrl(await response.blob())
+        return [sectionId, {
+          catalogId: item.id,
+          src,
+          altText: item.title,
+          caption: item.title,
+          width: item.width,
+          height: item.height,
+        } satisfies DocumentImage] as const
+      }))
+      const imagesBySection = new Map(resolved)
+      onDocumentUpdate(resetApproval({
+        ...documentContent,
+        sections: documentContent.sections.map(section => {
+          const image = imagesBySection.get(section.id)
+          return image ? { ...section, images: [...(section.images ?? []), image] } : section
+        }),
+      }))
+      setImageStatus(`Added ${resolved.length} location-matched photo${resolved.length === 1 ? '' : 's'}. Review them in the preview or edit each section.`)
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'Could not match itinerary images.')
+    } finally {
+      setIsMatchingImages(false)
+    }
+  }
+
   const handleSaveLocally = async () => {
     setSaveError(null)
     try {
@@ -270,6 +433,28 @@ export function DocumentWorkspace({
 
       {/* Document Content */}
       <div className="flex-1 overflow-y-auto">
+        {documentContent.documentType === 'tour_itinerary' && (
+          <div className="px-4 pt-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-2.5">
+              <ImagePlus size={15} className="text-blue-600" />
+              <span className="flex-1 text-xs text-blue-900">
+                {imageCatalog.length
+                  ? `${imageCatalog.length} destination photos available`
+                  : 'Add destination photos to your itinerary'}
+              </span>
+              <button
+                type="button"
+                onClick={handleAutoMatchImages}
+                disabled={isMatchingImages || imageCatalog.length === 0}
+                className="rounded-md bg-blue-600 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isMatchingImages ? 'Matching...' : 'Auto-match locations'}
+              </button>
+            </div>
+            {imageStatus && <p className="mt-1.5 text-[10px] text-green-700">{imageStatus}</p>}
+            {imageError && <p className="mt-1.5 text-[10px] text-red-600">{imageError}</p>}
+          </div>
+        )}
         {viewMode === 'preview' ? (
           <DocumentPreview documentContent={documentContent} />
         ) : (
@@ -280,6 +465,10 @@ export function DocumentWorkspace({
             onAddSection={handleAddSection}
             onTitleChange={handleTitleChange}
             onIntakeFieldUpdate={handleIntakeFieldUpdate}
+            onImagePick={setImagePickerSectionId}
+            onImageUpload={handleUploadImage}
+            onImageRemove={handleRemoveImage}
+            uploadingImageSectionId={uploadingImageSectionId}
           />
         )}
       </div>
@@ -405,6 +594,15 @@ export function DocumentWorkspace({
           PDF requires LibreOffice • DOCX uses Beyond Escapes template
         </p>
       </div>
+      {imagePickerSectionId && (
+        <ItineraryImagePicker
+          images={imageCatalog}
+          search={imageSearch}
+          onSearch={setImageSearch}
+          onSelect={handlePickLibraryImage}
+          onClose={() => { setImagePickerSectionId(null); setImageSearch('') }}
+        />
+      )}
     </div>
   )
 }
@@ -570,6 +768,29 @@ function DocumentIntakePreview({ intake }: { intake: NonNullable<DocumentContent
 }
 
 function SectionPreview({ section }: { section: DocumentSection }) {
+  return (
+    <>
+      <SectionBody section={section} />
+      {section.images?.map((image, index) => (
+        <figure key={`${section.id}-image-${index}`} className="my-3">
+          <Image
+            src={image.src}
+            alt={image.altText}
+            width={image.width}
+            height={image.height}
+            unoptimized
+            className="mx-auto max-h-[360px] w-auto max-w-full rounded-lg object-contain"
+          />
+          {image.caption && (
+            <figcaption className="mt-1 text-center text-xs text-gray-500">{image.caption}</figcaption>
+          )}
+        </figure>
+      ))}
+    </>
+  )
+}
+
+function SectionBody({ section }: { section: DocumentSection }) {
   switch (section.type) {
     case 'title':
       return <h1 className="text-xl font-bold text-gray-900 mb-4 font-serif">{section.content}</h1>
@@ -666,6 +887,10 @@ function DocumentEditor({
   onAddSection,
   onTitleChange,
   onIntakeFieldUpdate,
+  onImagePick,
+  onImageUpload,
+  onImageRemove,
+  uploadingImageSectionId,
 }: {
   documentContent: DocumentContent
   onSectionUpdate: (section: DocumentSection) => void
@@ -673,6 +898,10 @@ function DocumentEditor({
   onAddSection: (afterId: string, type: DocumentSection['type']) => void
   onTitleChange: (title: string) => void
   onIntakeFieldUpdate: (key: string, value: string) => void
+  onImagePick: (sectionId: string) => void
+  onImageUpload: (sectionId: string, file: File) => void
+  onImageRemove: (sectionId: string, index: number) => void
+  uploadingImageSectionId: string | null
 }) {
   return (
     <div className="p-4 space-y-2">
@@ -703,6 +932,11 @@ function DocumentEditor({
           onUpdate={onSectionUpdate}
           onDelete={() => onSectionDelete(section.id)}
           onAddAfter={(type) => onAddSection(section.id, type)}
+          showImageTools={documentContent.documentType === 'tour_itinerary'}
+          onImagePick={() => onImagePick(section.id)}
+          onImageUpload={file => onImageUpload(section.id, file)}
+          onImageRemove={index => onImageRemove(section.id, index)}
+          isUploadingImage={uploadingImageSectionId === section.id}
         />
       ))}
 
@@ -763,11 +997,21 @@ function SectionEditor({
   onUpdate,
   onDelete,
   onAddAfter,
+  showImageTools,
+  onImagePick,
+  onImageUpload,
+  onImageRemove,
+  isUploadingImage,
 }: {
   section: DocumentSection
   onUpdate: (s: DocumentSection) => void
   onDelete: () => void
   onAddAfter: (type: DocumentSection['type']) => void
+  showImageTools: boolean
+  onImagePick: () => void
+  onImageUpload: (file: File) => void
+  onImageRemove: (index: number) => void
+  isUploadingImage: boolean
 }) {
   const [showAdd, setShowAdd] = useState(false)
   const typeBadgeColor = {
@@ -833,6 +1077,56 @@ function SectionEditor({
             rows={section.type === 'paragraph' ? 3 : 1}
           />
         )}
+
+        {showImageTools && (
+          <div className="mt-3 border-t border-gray-100 pt-2">
+            {section.images?.map((image, index) => (
+              <div key={`${section.id}-image-${index}`} className="mb-2 flex items-center gap-2 rounded-md bg-gray-50 p-1.5">
+                <Image
+                  src={image.src}
+                  alt={image.altText}
+                  width={72}
+                  height={48}
+                  unoptimized
+                  className="h-12 w-[72px] rounded object-cover"
+                />
+                <span className="flex-1 truncate text-[10px] text-gray-600">{image.caption || image.altText}</span>
+                <button
+                  type="button"
+                  onClick={() => onImageRemove(index)}
+                  className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  title="Remove image"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onImagePick}
+                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[10px] text-gray-600 hover:bg-gray-50"
+              >
+                <ImagePlus size={12} /> Choose library photo
+              </button>
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[10px] text-gray-600 hover:bg-gray-50">
+                {isUploadingImage ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                {isUploadingImage ? 'Uploading...' : 'Add from device'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  disabled={isUploadingImage}
+                  onChange={event => {
+                    const file = event.currentTarget.files?.[0]
+                    if (file) onImageUpload(file)
+                    event.currentTarget.value = ''
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        )}
       </div>
 
       {showAdd && (
@@ -840,6 +1134,84 @@ function SectionEditor({
           <AddSectionButton onAdd={(type) => { onAddAfter(type); setShowAdd(false) }} compact />
         </div>
       )}
+    </div>
+  )
+}
+
+function ItineraryImagePicker({
+  images,
+  search,
+  onSearch,
+  onSelect,
+  onClose,
+}: {
+  images: ItineraryImageCatalogItem[]
+  search: string
+  onSearch: (value: string) => void
+  onSelect: (image: ItineraryImageCatalogItem) => void
+  onClose: () => void
+}) {
+  const query = search.trim().toLowerCase()
+  const filteredImages = images
+    .map(image => ({ image, score: query ? scoreItineraryImage(query, image) : 0 }))
+    .filter(({ image, score }) => !query || score > 0 || `${image.title} ${image.sourcePath}`.toLowerCase().includes(query))
+    .sort((left, right) => right.score - left.score || left.image.title.localeCompare(right.image.title))
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="itinerary-image-picker-title"
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+      >
+        <div className="flex items-center gap-3 border-b border-gray-100 p-4">
+          <div className="flex-1">
+            <h2 id="itinerary-image-picker-title" className="text-sm font-semibold text-gray-900">Choose a destination photo</h2>
+            <p className="mt-0.5 text-[11px] text-gray-500">Photos are optimized and embedded in this document.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close image picker">
+            <X size={16} />
+          </button>
+        </div>
+        <label className="relative m-3">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={event => onSearch(event.target.value)}
+            placeholder="Search Colombo, Kandy, Sigiriya..."
+            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
+          />
+        </label>
+        <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-3 pt-0 sm:grid-cols-3">
+          {filteredImages.map(({ image }) => (
+            <button
+              key={image.id}
+              type="button"
+              onClick={() => onSelect(image)}
+              className="overflow-hidden rounded-lg border border-gray-200 text-left hover:border-blue-400 hover:shadow-sm"
+            >
+              <Image
+                src={image.url}
+                alt={image.title}
+                width={image.width}
+                height={image.height}
+                unoptimized
+                className="h-28 w-full bg-gray-100 object-cover"
+              />
+              <span className="block truncate px-2 py-1.5 text-[11px] font-medium text-gray-700">{image.title}</span>
+            </button>
+          ))}
+          {filteredImages.length === 0 && (
+            <p className="col-span-full py-10 text-center text-xs text-gray-500">No matching photos found. Upload one from your device in the section editor.</p>
+          )}
+        </div>
+      </section>
     </div>
   )
 }

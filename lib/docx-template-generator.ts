@@ -6,6 +6,11 @@ import type { DocumentContent, DocumentSection } from '@/types'
 
 const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 const WORD_DRAWING_NS = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'
+const DRAWING_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+const PICTURE_NS = 'http://schemas.openxmlformats.org/drawingml/2006/picture'
+const OFFICE_REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+const PACKAGE_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships'
+const CONTENT_TYPES_NS = 'http://schemas.openxmlformats.org/package/2006/content-types'
 const XML_NS = 'http://www.w3.org/XML/1998/namespace'
 const CONTENT_WIDTH = 10080
 const BLUE = '3973B9'
@@ -30,6 +35,10 @@ function wordElement(document: XmlDocument, name: string): XmlElement {
 
 function setWordAttribute(element: XmlElement, name: string, value: string | number): void {
   element.setAttributeNS(WORD_NS, `w:${name}`, String(value))
+}
+
+function setXmlAttribute(element: XmlElement, namespace: string, prefix: string, name: string, value: string | number): void {
+  element.setAttributeNS(namespace, `${prefix}:${name}`, String(value))
 }
 
 function appendTextRun(parent: XmlElement, text: string, options: ParagraphOptions = {}): void {
@@ -536,6 +545,197 @@ function sectionElements(document: XmlDocument, section: DocumentSection): XmlEl
   }
 }
 
+function decodeItineraryImage(source: string): Buffer {
+  const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(source)
+  if (!match || match[1].length > 12 * 1024 * 1024) {
+    throw new Error('DOCX images must be optimized embedded JPEGs smaller than 9 MB.')
+  }
+  const image = Buffer.from(match[1], 'base64')
+  if (!image.length || image.length > 9 * 1024 * 1024) {
+    throw new Error('DOCX images must be non-empty and smaller than 9 MB.')
+  }
+  return image
+}
+
+function createImageParagraph(
+  document: XmlDocument,
+  image: NonNullable<DocumentSection['images']>[number],
+  relationshipId: string,
+  drawingId: number
+): XmlElement {
+  const naturalWidth = Math.max(1, Number(image.width) || 4)
+  const naturalHeight = Math.max(1, Number(image.height) || 3)
+  const scale = Math.min(5.8 * 914400 / naturalWidth, 4.2 * 914400 / naturalHeight)
+  const width = Math.round(naturalWidth * scale)
+  const height = Math.round(naturalHeight * scale)
+
+  const paragraph = wordElement(document, 'p')
+  const paragraphProperties = wordElement(document, 'pPr')
+  const alignment = wordElement(document, 'jc')
+  setWordAttribute(alignment, 'val', 'center')
+  paragraphProperties.appendChild(alignment)
+  const spacing = wordElement(document, 'spacing')
+  setWordAttribute(spacing, 'before', 80)
+  setWordAttribute(spacing, 'after', 40)
+  paragraphProperties.appendChild(spacing)
+  paragraph.appendChild(paragraphProperties)
+
+  const run = wordElement(document, 'r')
+  const drawing = wordElement(document, 'drawing')
+  const inline = document.createElementNS(WORD_DRAWING_NS, 'wp:inline')
+  for (const name of ['distT', 'distB', 'distL', 'distR']) {
+    inline.setAttribute(name, '0')
+  }
+  const extent = document.createElementNS(WORD_DRAWING_NS, 'wp:extent')
+  extent.setAttribute('cx', String(width))
+  extent.setAttribute('cy', String(height))
+  inline.appendChild(extent)
+
+  const documentProperties = document.createElementNS(WORD_DRAWING_NS, 'wp:docPr')
+  documentProperties.setAttribute('id', String(drawingId))
+  documentProperties.setAttribute('name', `Itinerary photo ${drawingId}`)
+  documentProperties.setAttribute('descr', image.altText.slice(0, 500))
+  inline.appendChild(documentProperties)
+
+  const frameProperties = document.createElementNS(WORD_DRAWING_NS, 'wp:cNvGraphicFramePr')
+  const frameLocks = document.createElementNS(DRAWING_NS, 'a:graphicFrameLocks')
+  frameLocks.setAttribute('noChangeAspect', '1')
+  frameProperties.appendChild(frameLocks)
+  inline.appendChild(frameProperties)
+
+  const graphic = document.createElementNS(DRAWING_NS, 'a:graphic')
+  const graphicData = document.createElementNS(DRAWING_NS, 'a:graphicData')
+  graphicData.setAttribute('uri', PICTURE_NS)
+  const picture = document.createElementNS(PICTURE_NS, 'pic:pic')
+
+  const nonVisual = document.createElementNS(PICTURE_NS, 'pic:nvPicPr')
+  const pictureProperties = document.createElementNS(PICTURE_NS, 'pic:cNvPr')
+  pictureProperties.setAttribute('id', String(drawingId))
+  pictureProperties.setAttribute('name', `Itinerary photo ${drawingId}.jpg`)
+  pictureProperties.setAttribute('descr', image.altText.slice(0, 500))
+  nonVisual.appendChild(pictureProperties)
+  const pictureLocks = document.createElementNS(PICTURE_NS, 'pic:cNvPicPr')
+  const aspectLocks = document.createElementNS(DRAWING_NS, 'a:picLocks')
+  aspectLocks.setAttribute('noChangeAspect', '1')
+  pictureLocks.appendChild(aspectLocks)
+  nonVisual.appendChild(pictureLocks)
+  picture.appendChild(nonVisual)
+
+  const fill = document.createElementNS(PICTURE_NS, 'pic:blipFill')
+  const blip = document.createElementNS(DRAWING_NS, 'a:blip')
+  setXmlAttribute(blip, OFFICE_REL_NS, 'r', 'embed', relationshipId)
+  fill.appendChild(blip)
+  const stretch = document.createElementNS(DRAWING_NS, 'a:stretch')
+  stretch.appendChild(document.createElementNS(DRAWING_NS, 'a:fillRect'))
+  fill.appendChild(stretch)
+  picture.appendChild(fill)
+
+  const shapeProperties = document.createElementNS(PICTURE_NS, 'pic:spPr')
+  const transform = document.createElementNS(DRAWING_NS, 'a:xfrm')
+  const offset = document.createElementNS(DRAWING_NS, 'a:off')
+  offset.setAttribute('x', '0')
+  offset.setAttribute('y', '0')
+  transform.appendChild(offset)
+  const pictureExtent = document.createElementNS(DRAWING_NS, 'a:ext')
+  pictureExtent.setAttribute('cx', String(width))
+  pictureExtent.setAttribute('cy', String(height))
+  transform.appendChild(pictureExtent)
+  shapeProperties.appendChild(transform)
+  const geometry = document.createElementNS(DRAWING_NS, 'a:prstGeom')
+  geometry.setAttribute('prst', 'rect')
+  geometry.appendChild(document.createElementNS(DRAWING_NS, 'a:avLst'))
+  shapeProperties.appendChild(geometry)
+  picture.appendChild(shapeProperties)
+
+  graphicData.appendChild(picture)
+  graphic.appendChild(graphicData)
+  inline.appendChild(graphic)
+  drawing.appendChild(inline)
+  run.appendChild(drawing)
+  paragraph.appendChild(run)
+  return paragraph
+}
+
+async function addItineraryImages(
+  archive: JSZip,
+  document: XmlDocument,
+  images: NonNullable<DocumentSection['images']>,
+  elements: XmlElement[]
+): Promise<void> {
+  if (!images.length) return
+
+  const relationshipsPath = 'word/_rels/document.xml.rels'
+  const relationshipsEntry = archive.file(relationshipsPath)
+  const contentTypesEntry = archive.file('[Content_Types].xml')
+  if (!relationshipsEntry || !contentTypesEntry) {
+    throw new Error('The selected Word template is missing image relationship metadata.')
+  }
+  const relationships = new DOMParser().parseFromString(
+    await relationshipsEntry.async('string'),
+    'application/xml'
+  )
+  const contentTypes = new DOMParser().parseFromString(
+    await contentTypesEntry.async('string'),
+    'application/xml'
+  )
+  const relationshipRoot = relationships.documentElement
+  const contentTypeRoot = contentTypes.documentElement
+  if (!relationshipRoot || !contentTypeRoot) throw new Error('The Word template has invalid image relationship metadata.')
+
+  const existingRelationshipIds = new Set(
+    Array.from(relationshipRoot.getElementsByTagNameNS(PACKAGE_REL_NS, 'Relationship'))
+      .map(relationship => relationship.getAttribute('Id'))
+  )
+  let hasJpegContentType = Array.from(contentTypeRoot.getElementsByTagNameNS(CONTENT_TYPES_NS, 'Default'))
+    .some(entry => entry.getAttribute('Extension')?.toLowerCase() === 'jpg')
+  const existingMediaPaths = new Set(
+    Object.keys(archive.files).filter(path => /^word\/media\/itinerary-image-\d+\.jpg$/.test(path))
+  )
+  let imageIndex = 0
+
+  for (const image of images) {
+    const bytes = decodeItineraryImage(image.src)
+    imageIndex += 1
+    let mediaPath = `word/media/itinerary-image-${imageIndex}.jpg`
+    while (existingMediaPaths.has(mediaPath)) {
+      imageIndex += 1
+      mediaPath = `word/media/itinerary-image-${imageIndex}.jpg`
+    }
+    existingMediaPaths.add(mediaPath)
+    let relationshipId = `rIdItineraryImage${imageIndex}`
+    while (existingRelationshipIds.has(relationshipId)) relationshipId += 'x'
+    existingRelationshipIds.add(relationshipId)
+    archive.file(mediaPath, bytes)
+
+    const relationship = relationships.createElementNS(PACKAGE_REL_NS, 'Relationship')
+    relationship.setAttribute('Id', relationshipId)
+    relationship.setAttribute('Type', `${OFFICE_REL_NS}/image`)
+    relationship.setAttribute('Target', `media/itinerary-image-${imageIndex}.jpg`)
+    relationshipRoot.appendChild(relationship)
+
+    if (!hasJpegContentType) {
+      const jpegContentType = contentTypes.createElementNS(CONTENT_TYPES_NS, 'Default')
+      jpegContentType.setAttribute('Extension', 'jpg')
+      jpegContentType.setAttribute('ContentType', 'image/jpeg')
+      contentTypeRoot.appendChild(jpegContentType)
+      hasJpegContentType = true
+    }
+
+    elements.push(createImageParagraph(document, image, relationshipId, imageIndex))
+    if (image.caption?.trim()) {
+      elements.push(createParagraph(document, image.caption, {
+        alignment: 'center',
+        after: 160,
+        size: 18,
+        font: 'Calibri',
+      }))
+    }
+  }
+
+  archive.file(relationshipsPath, new XMLSerializer().serializeToString(relationships))
+  archive.file('[Content_Types].xml', new XMLSerializer().serializeToString(contentTypes))
+}
+
 export async function generateBrandedDocx(content: DocumentContent, templatePath: string): Promise<Buffer> {
   const archive = await JSZip.loadAsync(fs.readFileSync(templatePath))
   const documentEntry = archive.file('word/document.xml')
@@ -568,6 +768,7 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
   for (const section of content.sections) {
     if (content.documentType === 'room_reservation') continue
     elements.push(...sectionElements(document, section))
+    await addItineraryImages(archive, document, section.images ?? [], elements)
   }
   if (!content.documentType || content.documentType === 'tour_itinerary' || content.documentType === 'tour_proposal') {
     elements.push(createParagraph(document, '****END OF SERVICES****', { bold: true, before: 240, alignment: 'center' }))

@@ -6,6 +6,26 @@ export interface DocumentSection {
   items?: string[]  // for lists
   rows?: string[][]  // for tables
   headers?: string[]  // for table headers
+  images?: DocumentImage[]
+}
+
+export interface DocumentImage {
+  catalogId?: string
+  src: string
+  altText: string
+  caption?: string
+  width: number
+  height: number
+}
+
+export interface ItineraryImageCatalogItem {
+  id: string
+  title: string
+  sourceName: string
+  sourcePath: string
+  url: string
+  width: number
+  height: number
 }
 
 export interface DocumentContent {

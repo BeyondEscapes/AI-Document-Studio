@@ -10,6 +10,9 @@ Usage: python generate_docx.py <template_path> <content_json_path> <output_path>
 
 import sys
 import json
+import base64
+import binascii
+import io
 import shutil
 import os
 import copy
@@ -172,6 +175,47 @@ def add_regular_paragraph(doc, text: str):
     rPr.append(u_elem)
     
     return para
+
+
+def add_document_images(doc, images):
+    for image in images:
+        if not isinstance(image, dict):
+            raise ValueError('Document images must be objects containing image data.')
+        source = image.get('src', '')
+        match = re.fullmatch(r'data:image/(?:jpeg|png);base64,([A-Za-z0-9+/=\r\n]+)', source)
+        if not match:
+            raise ValueError('Document image data must be an embedded JPEG or PNG.')
+
+        encoded = match.group(1)
+        if len(encoded) > 12 * 1024 * 1024:
+            raise ValueError('Document images must be 9 MB or smaller after optimization.')
+        try:
+            image_bytes = base64.b64decode(encoded, validate=True)
+        except binascii.Error as error:
+            raise ValueError('Document image data is not valid base64.') from error
+        if not image_bytes or len(image_bytes) > 9 * 1024 * 1024:
+            raise ValueError('Document images must be non-empty and 9 MB or smaller.')
+        if source.startswith('data:image/jpeg;') and image_bytes.startswith(b'\xff\xd8'):
+            if image_bytes[2:4] not in (b'\xff\xe0', b'\xff\xe1'):
+                jfif_header = bytes.fromhex('ffe000104a46494600010100000100010000')
+                image_bytes = image_bytes[:2] + jfif_header + image_bytes[2:]
+
+        paragraph = doc.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.space_before = Pt(4)
+        paragraph.paragraph_format.space_after = Pt(4)
+        picture = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(5.8))
+        picture._inline.docPr.set('descr', str(image.get('altText') or image.get('caption') or 'Itinerary photo')[:500])
+        picture._inline.docPr.set('title', str(image.get('caption') or image.get('altText') or 'Itinerary photo')[:255])
+        caption = image.get('caption')
+        if caption:
+            caption_paragraph = doc.add_paragraph()
+            caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption_paragraph.paragraph_format.space_after = Pt(8)
+            run = caption_paragraph.add_run(str(caption)[:255])
+            run.font.name = 'Calibri'
+            run.font.size = Pt(9)
+            run.font.italic = True
 
 
 def add_title_paragraph(doc, text: str):
@@ -608,6 +652,8 @@ def generate_document(template_path: str, content: dict, output_path: str):
         
         elif section_type == 'page_break':
             add_page_break(doc)
+
+        add_document_images(doc, section.get('images', []))
         
         # Add a small spacer paragraph between major sections
         if section_type in ('heading1',) and i < len(sections) - 1:
