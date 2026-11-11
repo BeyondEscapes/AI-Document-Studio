@@ -15,15 +15,16 @@ A professional, local AI-powered document creation web application. Users chat w
    - **Word (.docx)**: Generated via `python-docx` template replication.
    - **PDF (.pdf)**: High-resolution conversion using LibreOffice headless and native Word COM automation on Windows, ensuring identical visual identity.
 
-3. **Real AI Chat Assistant (Gemini API)**
-   - Official current `@google/genai` SDK integration.
-   - Generates typed document models (`title`, `heading1`, `heading2`, `paragraph`, `bullet_list`, `numbered_list`, `table`).
-   - Revision support: expand, shorten, rewrite, or correct sections.
-   - Safe server-side API key protection (keys never reach client code).
+3. **Unified AI Business Document Generator (Gemini API)**
+   - One real Gemini-powered chat identifies Room Reservations, Hotel Vouchers, Tour Itineraries, Invoices, Transport Confirmations, Rooming Lists, Business Letters, Tour Proposals, and other business documents.
+   - Extracts supplied facts into typed fields and asks for required details before generating incomplete bookings, invoices, or confirmations.
+   - Never invents prices, guest or booking data, references, dates, or confirmation status.
+   - Revision support: expand, shorten, rewrite, or correct sections. API keys stay server-side.
 
 4. **Live Document Workspace & Editor**
-   - Dual-mode: **Preview** (visual representation of final document) and **Edit** (modify headings, paragraphs, bullet lists, add/remove sections).
-   - Template switcher (switch between Beyond Escapes Official and custom uploaded templates).
+   - Dual-mode: **Preview** (visual representation of final document) and **Edit** (modify structured fields, headings, paragraphs, bullet lists, and tables).
+   - Review and approve documents, save changes locally, and export editable DOCX or PDF.
+   - Template switcher (Beyond Escapes Official and custom uploaded templates).
 
 5. **Local Persistence & Privacy**
    - Fast SQLite database (`studio.db`) stores conversations, messages, document states, custom templates, and settings.
@@ -151,6 +152,7 @@ doc_theme/
 ├── lib/
 │   ├── db.ts                           # SQLite database layer (better-sqlite3)
 │   ├── export.ts                       # Export orchestrator (DOCX & PDF)
+│   ├── business-documents.ts           # Document-type templates and required intake fields
 │   └── gemini.ts                       # Google Gen AI SDK integration
 ├── public/
 │   └── images/                         # Beyond Escapes logos & icons
@@ -162,6 +164,14 @@ doc_theme/
 ├── package.json                        # Dependencies & npm scripts
 └── README.md                           # Documentation & instructions
 ```
+
+---
+
+## Business Document Templates
+
+The existing chat, conversation storage, branded DOCX/PDF export, and uploaded Word templates power all document types. `lib/business-documents.ts` defines the document types, required intake fields, and reusable layout guidance. Room Reservations use the supplied Earls Regent PDF as a layout reference (reservation heading, tour/market details, hotel/location, guest composition, stay and room allocation tables, and remarks) while applying the selected Beyond Escapes Word template for the official logo, fonts, headers, and footer. The uploaded PDF itself is not used as a source of guest or booking data.
+
+To add a document type, add its field schema and required-field rules to `BUSINESS_DOCUMENT_TEMPLATES`. Update the Gemini guidance and any type-specific preview/export renderer only when the new type needs a specialized layout; the generic branded layout and custom `.docx` theme upload remain reusable.
 
 ---
 

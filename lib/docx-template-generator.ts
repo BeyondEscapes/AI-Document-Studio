@@ -1,6 +1,7 @@
 import fs from 'fs'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import JSZip from 'jszip'
+import { BUSINESS_DOCUMENT_TEMPLATES } from '@/lib/business-documents'
 import type { DocumentContent, DocumentSection } from '@/types'
 
 const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -135,7 +136,12 @@ function createHeadingBar(document: XmlDocument, text: string): XmlElement {
   return table
 }
 
-function createDataTable(document: XmlDocument, section: DocumentSection): XmlElement {
+function createDataTable(
+  document: XmlDocument,
+  section: DocumentSection,
+  headerFill = BLUE,
+  headerTextColor = 'FFFFFF'
+): XmlElement {
   const headers = section.headers ?? []
   const rows = section.rows ?? []
   const columnCount = Math.max(headers.length, ...rows.map(row => row.length), 1)
@@ -179,13 +185,13 @@ function createDataTable(document: XmlDocument, section: DocumentSection): XmlEl
         const shading = wordElement(document, 'shd')
         setWordAttribute(shading, 'val', 'clear')
         setWordAttribute(shading, 'color', 'auto')
-        setWordAttribute(shading, 'fill', BLUE)
+        setWordAttribute(shading, 'fill', headerFill)
         cellProperties.appendChild(shading)
       }
       cell.appendChild(cellProperties)
       cell.appendChild(createParagraph(document, values[index] ?? '', {
         bold: isHeader,
-        color: isHeader ? 'FFFFFF' : undefined,
+        color: isHeader ? headerTextColor : undefined,
         size: 22,
       }))
       row.appendChild(cell)
@@ -196,6 +202,89 @@ function createDataTable(document: XmlDocument, section: DocumentSection): XmlEl
   if (headers.length) addRow(headers, true)
   for (const row of rows) addRow(row, false)
   return table
+}
+
+function roomReservationElements(document: XmlDocument, fields: Record<string, string>): XmlElement[] {
+  const elements: XmlElement[] = [
+    createParagraph(document, 'ROOM RESERVATION', { bold: true, alignment: 'center', after: 280, size: 28 }),
+  ]
+  const metadata = [
+    ['Tour Number', fields.tourNumber],
+    ['Market', fields.market],
+    ['Date', fields.documentDate],
+  ].filter((entry): entry is [string, string] => Boolean(entry[1]))
+  if (metadata.length) {
+    elements.push(createParagraph(document, metadata.map(([label, value]) => `${label}: ${value}`).join('    '), { size: 20, after: 40 }))
+  }
+  if (fields.hotel) elements.push(createParagraph(document, `Hotel: ${fields.hotel}`, { size: 20, before: 160, after: 20 }))
+  if (fields.location) elements.push(createParagraph(document, `Location: ${fields.location}`, { size: 20, after: 120 }))
+
+  const guestFieldLabels: Record<string, string> = {
+    clientName: 'CLIENT NAME',
+    guestComposition: 'GUESTS',
+    adults: 'ADULT',
+    children: 'CHILD',
+    infants: 'INFANT',
+  }
+  const guestEntries = Object.entries(guestFieldLabels)
+    .filter(([key]) => Boolean(fields[key]))
+  if (guestEntries.length) {
+    elements.push(createDataTable(document, {
+      id: 'reservation-guests',
+      type: 'table',
+      content: '',
+      headers: guestEntries.map(([, label]) => label),
+      rows: [guestEntries.map(([key]) => fields[key])],
+    }, 'E5E7EB', '000000'))
+  }
+
+  const stayFieldLabels: Record<string, string> = {
+    checkIn: 'CHECK-IN',
+    checkOut: 'CHECK-OUT',
+    basis: 'BASIS',
+    roomAllocation: 'ROOM ALLOCATION',
+    roomCategory: 'ROOM CATEGORY',
+    nights: 'NIGHTS',
+  }
+  const stayEntries = Object.entries(stayFieldLabels)
+    .filter(([key]) => Boolean(fields[key]))
+  if (stayEntries.length) {
+    elements.push(createDataTable(document, {
+      id: 'reservation-stay',
+      type: 'table',
+      content: '',
+      headers: stayEntries.map(([, label]) => label),
+      rows: [stayEntries.map(([key]) => fields[key])],
+    }, 'E5E7EB', '000000'))
+  }
+
+  if (fields.remarks) {
+    elements.push(createParagraph(document, 'REMARKS:', { bold: true, before: 160, after: 40, size: 20 }))
+    elements.push(...fields.remarks.split(/\r?\n/).filter(line => line.trim()).map(line =>
+      createParagraph(document, `\u2022  ${line.trim().replace(/^[\u2022*-]\s*/, '')}`, { size: 20 })
+    ))
+  }
+  return elements
+}
+
+function documentIntakeElements(document: XmlDocument, content: DocumentContent): XmlElement[] {
+  const intake = content.intake
+  if (!intake || intake.documentType === 'room_reservation') return []
+
+  const fields = BUSINESS_DOCUMENT_TEMPLATES[intake.documentType].fields
+    .filter(field => intake.fields[field.key]?.trim())
+  if (!fields.length) return []
+
+  return [
+    createHeadingBar(document, 'DOCUMENT DETAILS'),
+    createDataTable(document, {
+      id: 'document-details',
+      type: 'table',
+      content: '',
+      headers: ['DETAIL', 'PROVIDED INFORMATION'],
+      rows: fields.map(field => [field.label, intake.fields[field.key]]),
+    }),
+  ]
 }
 
 function sectionElements(document: XmlDocument, section: DocumentSection): XmlElement[] {
@@ -249,13 +338,19 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
 
   const hasTitleSection = content.sections.some(section => section.type === 'title')
   const elements: XmlElement[] = []
-  if (content.title && !hasTitleSection) {
+  if (content.documentType === 'room_reservation') {
+    elements.push(...roomReservationElements(document, content.intake?.fields ?? {}))
+  } else if (content.title && !hasTitleSection) {
     elements.push(createParagraph(document, content.title, { bold: true, after: 160 }))
   }
+  elements.push(...documentIntakeElements(document, content))
   for (const section of content.sections) {
+    if (content.documentType === 'room_reservation' && section.type === 'title') continue
     elements.push(...sectionElements(document, section))
   }
-  elements.push(createParagraph(document, '****END OF SERVICES****', { bold: true, before: 240, alignment: 'center' }))
+  if (!content.documentType || content.documentType === 'tour_itinerary' || content.documentType === 'tour_proposal') {
+    elements.push(createParagraph(document, '****END OF SERVICES****', { bold: true, before: 240, alignment: 'center' }))
+  }
 
   for (const element of elements) {
     if (sectionProperties) body.insertBefore(element, sectionProperties)

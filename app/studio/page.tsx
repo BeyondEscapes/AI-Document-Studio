@@ -17,6 +17,7 @@ export default function StudioPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isDocPanelOpen, setIsDocPanelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [documentSaveStatus, setDocumentSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   // Load initial data
   useEffect(() => {
@@ -65,6 +66,7 @@ export default function StudioPage() {
     setActiveConversation(null)
     setDocumentContent(null)
     setIsDocPanelOpen(false)
+    setDocumentSaveStatus('idle')
   }, [])
 
   const handleSelectConversation = useCallback(async (conversation: Conversation) => {
@@ -73,9 +75,15 @@ export default function StudioPage() {
       const data = await res.json()
       if (data.success) {
         setActiveConversation(data.conversation)
+        if (data.conversation.selectedTheme) setSelectedThemeId(data.conversation.selectedTheme)
         if (data.conversation.documentContent) {
           setDocumentContent(data.conversation.documentContent)
           setIsDocPanelOpen(true)
+          setDocumentSaveStatus('saved')
+        } else {
+          setDocumentContent(null)
+          setIsDocPanelOpen(false)
+          setDocumentSaveStatus('idle')
         }
       }
     } catch (err) {
@@ -91,13 +99,18 @@ export default function StudioPage() {
         setActiveConversation(null)
         setDocumentContent(null)
         setIsDocPanelOpen(false)
+        setDocumentSaveStatus('idle')
       }
     } catch (err) {
       console.error('Failed to delete conversation:', err)
     }
   }, [activeConversation])
 
-  const handleMessageSent = useCallback((updatedConversation: Conversation, newDocContent?: DocumentContent) => {
+  const handleMessageSent = useCallback((
+    updatedConversation: Conversation,
+    newDocContent?: DocumentContent,
+    clearDocument = false
+  ) => {
     setActiveConversation(updatedConversation)
     setConversations(prev => {
       const idx = prev.findIndex(c => c.id === updatedConversation.id)
@@ -111,22 +124,51 @@ export default function StudioPage() {
     if (newDocContent) {
       setDocumentContent(newDocContent)
       setIsDocPanelOpen(true)
+      setDocumentSaveStatus('saved')
+    } else if (clearDocument) {
+      setDocumentContent(null)
+      setIsDocPanelOpen(false)
+      setDocumentSaveStatus('idle')
     }
   }, [])
 
-  const handleDocumentUpdate = useCallback((content: DocumentContent) => {
-    setDocumentContent(content)
-    if (activeConversation) {
-      const updated = { ...activeConversation, documentContent: content, updatedAt: new Date().toISOString() }
-      setActiveConversation(updated)
-      // Persist
-      fetch(`/api/conversations/${activeConversation.id}`, {
+  const persistDocument = useCallback(async (content: DocumentContent) => {
+    if (!activeConversation) {
+      setDocumentSaveStatus('error')
+      throw new Error('Start a conversation before saving a document.')
+    }
+
+    setDocumentSaveStatus('saving')
+    try {
+      const res = await fetch(`/api/conversations/${activeConversation.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentContent: content }),
-      }).catch(console.error)
+        body: JSON.stringify({ documentContent: content, selectedTheme: selectedThemeId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Could not save this document locally.')
+      }
+
+      setActiveConversation(data.conversation)
+      setConversations(prev => prev.map(item =>
+        item.id === data.conversation.id ? data.conversation : item
+      ))
+      setDocumentSaveStatus('saved')
+    } catch (err) {
+      setDocumentSaveStatus('error')
+      throw err
     }
-  }, [activeConversation])
+  }, [activeConversation, selectedThemeId])
+
+  const handleDocumentUpdate = useCallback((content: DocumentContent) => {
+    setDocumentContent(content)
+    void persistDocument(content).catch(err => console.error('Failed to save document locally:', err))
+  }, [persistDocument])
+
+  const handleSaveDocument = useCallback(async () => {
+    if (documentContent) await persistDocument(documentContent)
+  }, [documentContent, persistDocument])
 
   const handleSettingsUpdate = useCallback(async (newSettings: Partial<AppSettings>) => {
     try {
@@ -189,6 +231,8 @@ export default function StudioPage() {
               selectedThemeId={selectedThemeId}
               onThemeChange={setSelectedThemeId}
               onDocumentUpdate={handleDocumentUpdate}
+              onSaveDocument={handleSaveDocument}
+              saveStatus={documentSaveStatus}
               onClose={() => setIsDocPanelOpen(false)}
             />
           </div>

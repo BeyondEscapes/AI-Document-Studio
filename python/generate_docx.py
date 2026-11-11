@@ -233,6 +233,115 @@ def add_data_table(doc, headers, rows):
     return table
 
 
+def add_room_reservation_reference(doc, fields):
+    """Render the structured reservation details in the supplied PDF's table layout."""
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.paragraph_format.space_after = Pt(14)
+    title_run = title.add_run('ROOM RESERVATION')
+    title_run.font.name = 'Times New Roman'
+    title_run.font.bold = True
+    title_run.font.size = Pt(14)
+
+    metadata = [
+        ('Tour Number', fields.get('tourNumber')),
+        ('Market', fields.get('market')),
+        ('Date', fields.get('documentDate')),
+    ]
+    for label, value in metadata:
+        if value:
+            paragraph = doc.add_paragraph()
+            paragraph.paragraph_format.space_after = Pt(1)
+            run = paragraph.add_run(f'{label}: {value}')
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(10)
+
+    for label, key in [('Hotel', 'hotel'), ('Location', 'location')]:
+        if fields.get(key):
+            paragraph = doc.add_paragraph()
+            paragraph.paragraph_format.space_before = Pt(10 if key == 'hotel' else 0)
+            paragraph.paragraph_format.space_after = Pt(1)
+            run = paragraph.add_run(f'{label}: {fields[key]}')
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(10)
+
+    guest_fields = [
+        ('CLIENT NAME', 'clientName'),
+        ('GUESTS', 'guestComposition'),
+        ('ADULT', 'adults'),
+        ('CHILD', 'children'),
+        ('INFANT', 'infants'),
+    ]
+    guest_headers = [label for label, key in guest_fields if fields.get(key)]
+    guest_values = [fields[key] for _, key in guest_fields if fields.get(key)]
+    if guest_headers:
+        add_reservation_table(doc, guest_headers, [guest_values])
+
+    stay_fields = [
+        ('CHECK-IN', 'checkIn'),
+        ('CHECK-OUT', 'checkOut'),
+        ('BASIS', 'basis'),
+    ]
+    room_count_fields = [
+        ('SGL', 'singleRooms'),
+        ('DBL', 'doubleRooms'),
+        ('TWN', 'twinRooms'),
+        ('TPL', 'tripleRooms'),
+    ]
+    if any(fields.get(key) for _, key in room_count_fields):
+        stay_fields.extend(room_count_fields)
+    else:
+        stay_fields.append(('ROOM ALLOCATION', 'roomAllocation'))
+    stay_fields.extend([('ROOM CATEGORY', 'roomCategory'), ('NIGHTS', 'nights')])
+    stay_headers = [label for label, key in stay_fields if fields.get(key)]
+    stay_values = [fields[key] for _, key in stay_fields if fields.get(key)]
+    if stay_headers:
+        add_reservation_table(doc, stay_headers, [stay_values])
+
+    if fields.get('remarks'):
+        remarks_heading = doc.add_paragraph()
+        remarks_heading.paragraph_format.space_before = Pt(12)
+        remarks_heading.paragraph_format.space_after = Pt(2)
+        run = remarks_heading.add_run('REMARKS:')
+        run.font.name = 'Times New Roman'
+        run.font.bold = True
+        run.font.size = Pt(10)
+        for remark in fields['remarks'].splitlines():
+            if remark.strip():
+                add_bullet_paragraph(doc, remark.strip().lstrip('•-* ').strip())
+
+
+def add_reservation_table(doc, headers, rows):
+    """Create the compact, bordered gray-header tables used in the PDF reference."""
+    table = doc.add_table(rows=1 + len(rows), cols=len(headers))
+    table.style = 'Table Grid'
+    table.autofit = True
+
+    for column, header in enumerate(headers):
+        cell = table.rows[0].cells[column]
+        cell.text = ''
+        shading = OxmlElement('w:shd')
+        shading.set(qn('w:val'), 'clear')
+        shading.set(qn('w:color'), 'auto')
+        shading.set(qn('w:fill'), 'E5E7EB')
+        cell._tc.get_or_add_tcPr().append(shading)
+        run = cell.paragraphs[0].add_run(header)
+        run.font.name = 'Times New Roman'
+        run.font.bold = True
+        run.font.size = Pt(8)
+
+    for row_index, values in enumerate(rows, start=1):
+        for column, value in enumerate(values):
+            cell = table.rows[row_index].cells[column]
+            cell.text = ''
+            run = cell.paragraphs[0].add_run(str(value))
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(9)
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_after = Pt(2)
+
+
 def add_page_break(doc):
     """Add a page break."""
     doc.add_page_break()
@@ -282,9 +391,25 @@ def generate_document(template_path: str, content: dict, output_path: str):
     sections = content.get('sections', [])
     title = content.get('title', '')
     
+    document_type = content.get('documentType')
+    intake = content.get('intake') or {}
+    fields = intake.get('fields') or {}
+
+    if document_type == 'room_reservation':
+        add_room_reservation_reference(doc, fields)
+    elif document_type and fields:
+        details = [
+            [humanize_field_name(key), value]
+            for key, value in fields.items()
+            if isinstance(value, str) and value.strip()
+        ]
+        if details:
+            add_blue_heading_bar(doc, 'DOCUMENT DETAILS')
+            add_data_table(doc, ['DETAIL', 'PROVIDED INFORMATION'], details)
+
     # Add title if provided and not already in sections
     has_title_section = any(s.get('type') == 'title' for s in sections)
-    if title and not has_title_section:
+    if title and not has_title_section and document_type != 'room_reservation':
         add_title_paragraph(doc, title)
     
     # Add each section
@@ -335,18 +460,27 @@ def generate_document(template_path: str, content: dict, output_path: str):
             # No extra space needed - heading bar already has built-in spacing
             pass
     
-    # Add end marker
-    end_para = doc.add_paragraph()
-    end_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    end_para.paragraph_format.space_before = Pt(12)
-    run = end_para.add_run('****END OF SERVICES****')
-    run.font.name = 'Times New Roman'
-    run.font.bold = True
-    run.font.size = Pt(12)
+    if document_type in (None, 'tour_itinerary', 'tour_proposal'):
+        end_para = doc.add_paragraph()
+        end_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        end_para.paragraph_format.space_before = Pt(12)
+        run = end_para.add_run('****END OF SERVICES****')
+        run.font.name = 'Times New Roman'
+        run.font.bold = True
+        run.font.size = Pt(12)
     
     # Save document
     doc.save(output_path)
     print(f"SUCCESS: Document saved to {output_path}", flush=True)
+
+
+def humanize_field_name(key):
+    label = []
+    for char in key:
+        if char.isupper():
+            label.append(' ')
+        label.append(char)
+    return ''.join(label).replace('_', ' ').strip().title()
 
 
 def main():

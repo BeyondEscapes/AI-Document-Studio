@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Send, FileText, RefreshCw, AlertCircle, Sparkles, ChevronRight, ExternalLink } from 'lucide-react'
+import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel } from '@/lib/business-documents'
 import type { Conversation, ChatMessage, DocumentContent, AppSettings } from '@/types'
 
 interface ChatPanelProps {
@@ -9,17 +10,19 @@ interface ChatPanelProps {
   apiKeyConfigured: boolean
   selectedThemeId: string
   settings: AppSettings | null
-  onMessageSent: (conversation: Conversation, docContent?: DocumentContent) => void
+  onMessageSent: (conversation: Conversation, docContent?: DocumentContent, clearDocument?: boolean) => void
   onToggleDocPanel: () => void
   isDocPanelOpen: boolean
 }
 
 const QUICK_PROMPTS = [
   'Create a 5-day Sri Lanka itinerary from Colombo to Kandy to Bentota',
-  'Write a welcome letter for guests arriving from Germany',
-  'Create a 3-day tour proposal covering Sigiriya and Polonnaruwa',
-  'Draft an itinerary for a cultural tour of Colombo',
-  'Write a beach and wellness itinerary for Bentota',
+  'Create a room reservation using the hotel and guest details I provide',
+  'Prepare a hotel voucher from my confirmed booking details',
+  'Create an invoice from the line items, amounts, currency, and date I provide',
+  'Prepare a transport confirmation using my service and booking details',
+  'Create a rooming list from the guest names and room assignments I provide',
+  'Write a business letter using the recipient and key points I provide',
 ]
 
 export function ChatPanel({
@@ -93,6 +96,7 @@ export function ChatPanel({
           message: text,
           conversationId: currentConvId.current,
           model: settings?.geminiModel || 'gemini-3.5-flash',
+          selectedThemeId,
         }),
       })
 
@@ -109,7 +113,7 @@ export function ChatPanel({
         const convData = await convRes.json()
         if (convData.success) {
           setMessages(convData.conversation.messages)
-          onMessageSent(convData.conversation, data.message?.documentContent)
+          onMessageSent(convData.conversation, data.message?.documentContent, data.documentCleared)
         }
       }
     } catch (err) {
@@ -170,7 +174,7 @@ export function ChatPanel({
               AI Document Studio
             </h2>
             <p className="text-sm text-gray-500 text-center max-w-sm mb-6">
-              Chat with AI to create professional travel documents. Generated content will be formatted with the Beyond Escapes brand template.
+              Describe the document you need. The same AI chat creates travel documents and business paperwork using Beyond Escapes templates.
             </p>
 
             {!apiKeyConfigured && (
@@ -243,7 +247,7 @@ export function ChatPanel({
             value={input}
             onChange={(e) => { setInput(e.target.value); autoResizeTextarea() }}
             onKeyDown={handleKeyDown}
-            placeholder="Describe the document you need... (e.g. 'Create a 7-day Sri Lanka itinerary')"
+            placeholder="Ask for a reservation, voucher, itinerary, invoice, confirmation, letter, or another business document..."
             rows={1}
             disabled={isLoading}
             className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 resize-none outline-none min-h-[36px] max-h-40 py-1 disabled:opacity-50"
@@ -265,6 +269,32 @@ export function ChatPanel({
           Press Enter to send • Shift+Enter for new line
         </p>
       </div>
+    </div>
+  )
+}
+
+function DocumentIntakeCard({ intake }: { intake: NonNullable<ChatMessage['documentIntake']> }) {
+  const template = BUSINESS_DOCUMENT_TEMPLATES[intake.documentType]
+  const suppliedFields = template.fields.filter(field => intake.fields[field.key]?.trim())
+
+  return (
+    <div className="w-full mt-1 rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-xs">
+      <p className="font-semibold text-blue-800">{template.label} details</p>
+      {suppliedFields.length > 0 && (
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          {suppliedFields.map(field => (
+            <div key={field.key} className="contents">
+              <dt className="text-gray-500">{field.label}</dt>
+              <dd className="min-w-0 text-gray-800 break-words">{intake.fields[field.key]}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {intake.missingFields.length > 0 && (
+        <p className="mt-2 text-amber-700">
+          Still needed: {intake.missingFields.map(key => getDocumentFieldLabel(intake.documentType, key)).join(', ')}
+        </p>
+      )}
     </div>
   )
 }
@@ -324,6 +354,10 @@ function ChatMessageBubble({ message, onViewDocument }: { message: ChatMessage; 
             <span>View: {message.documentContent.title}</span>
             <ChevronRight size={11} />
           </button>
+        )}
+
+        {message.documentIntake && (
+          <DocumentIntakeCard intake={message.documentIntake} />
         )}
 
         <span className="text-[10px] text-gray-400 px-1">

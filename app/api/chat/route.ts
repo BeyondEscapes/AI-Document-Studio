@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocumentContent, checkApiKey, normalizeModel } from '@/lib/gemini'
-import { saveConversation, getConversation } from '@/lib/db'
+import { getDocumentFieldLabel, getMissingRequiredFields, mergeDocumentIntakes } from '@/lib/business-documents'
+import { saveConversation, getConversation, getTheme } from '@/lib/db'
 import { v4 as uuidv4 } from 'uuid'
 import type { ChatMessage, Conversation } from '@/types'
 
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { message, conversationId, model } = body
+    const { message, conversationId, model, selectedThemeId } = body
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
@@ -56,10 +57,17 @@ export async function POST(request: NextRequest) {
       .filter(m => m.role !== 'system' && !m.isLoading)
       .map(m => ({
         role: m.role === 'assistant' ? 'model' as const : 'user' as const,
-        parts: [{ text: m.role === 'assistant' && m.documentContent
-          ? JSON.stringify({ message: m.content, documentContent: m.documentContent })
+        parts: [{ text: m.role === 'assistant' && (m.documentContent || m.documentIntake)
+          ? JSON.stringify({
+              message: m.content,
+              ...(m.documentIntake ? { documentIntake: m.documentIntake } : {}),
+              ...(m.documentContent ? { documentContent: m.documentContent } : {}),
+            })
           : m.content }],
       }))
+    const previousIntake = [...conversation.messages]
+      .reverse()
+      .find(m => m.documentIntake)?.documentIntake
 
     // Add user message to conversation
     const userMessage: ChatMessage = {
@@ -72,14 +80,42 @@ export async function POST(request: NextRequest) {
 
     // Generate AI response with normalized model
     const result = await generateDocumentContent(message, history, normalizeModel(model))
+    const documentIntake = result.documentIntake
+      ? mergeDocumentIntakes(result.isNewDocument ? undefined : previousIntake, result.documentIntake)
+      : undefined
+    const missingFields = documentIntake ? getMissingRequiredFields(documentIntake) : []
+    let responseText = result.message
+    let documentContent = result.documentContent
+
+    if (documentIntake && missingFields.length > 0) {
+      const missingLabels = missingFields
+        .map(key => getDocumentFieldLabel(documentIntake.documentType, key))
+      responseText = `I've identified this as a ${documentIntake.documentType.replaceAll('_', ' ')}. To prepare it accurately, could you provide these missing details: ${missingLabels.join(', ')}?`
+      documentContent = null
+    } else if (documentIntake && documentContent) {
+      documentContent = {
+        ...documentContent,
+        documentType: documentIntake.documentType,
+        intake: documentIntake,
+        approval: { status: 'draft' },
+      }
+    } else if (documentContent) {
+      responseText = 'I could not identify and validate the document details. Please tell me which business document you need and provide its source details.'
+      documentContent = null
+    }
+
+    if (documentIntake) {
+      documentIntake.missingFields = missingFields
+    }
 
     // Add assistant message
     const assistantMessage: ChatMessage = {
       id: uuidv4(),
       role: 'assistant',
-      content: result.message,
+      content: responseText,
       timestamp: new Date().toISOString(),
-      documentContent: result.documentContent || undefined,
+      documentContent: documentContent || undefined,
+      documentIntake: documentIntake || undefined,
     }
     conversation.messages.push(assistantMessage)
 
@@ -89,9 +125,15 @@ export async function POST(request: NextRequest) {
       conversation.title = titleText
     }
 
-    // Update document content on conversation
-    if (result.documentContent) {
-      conversation.documentContent = result.documentContent
+    // Keep an incomplete new document from leaving a different document active in the workspace.
+    const documentCleared = Boolean(documentIntake && missingFields.length > 0 && conversation.documentContent)
+    if (documentContent) {
+      conversation.documentContent = documentContent
+    } else if (documentCleared) {
+      conversation.documentContent = undefined
+    }
+    if (typeof selectedThemeId === 'string' && getTheme(selectedThemeId)) {
+      conversation.selectedTheme = selectedThemeId
     }
 
     conversation.updatedAt = new Date().toISOString()
@@ -103,6 +145,7 @@ export async function POST(request: NextRequest) {
       success: true,
       conversationId: conversation.id,
       message: assistantMessage,
+      documentCleared,
       conversation: {
         id: conversation.id,
         title: conversation.title,

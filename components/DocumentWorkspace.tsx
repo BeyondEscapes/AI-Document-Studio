@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import Image from 'next/image'
 import {
   FileText, Download, X, Edit3, Eye, FileDown,
   ChevronDown, ChevronUp, Trash2, Plus, AlertCircle,
-  CheckCircle, Loader2, Palette, RefreshCw
+  CheckCircle, Loader2, Palette, RefreshCw, Save, BadgeCheck
 } from 'lucide-react'
+import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel, getMissingRequiredFields } from '@/lib/business-documents'
 import type { DocumentContent, DocumentSection, DocumentTheme } from '@/types'
 
 interface DocumentWorkspaceProps {
@@ -14,15 +16,23 @@ interface DocumentWorkspaceProps {
   selectedThemeId: string
   onThemeChange: (themeId: string) => void
   onDocumentUpdate: (content: DocumentContent) => void
+  onSaveDocument: () => Promise<void>
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   onClose: () => void
 }
 
 type ViewMode = 'preview' | 'edit'
 
+function resetApproval(content: DocumentContent): DocumentContent {
+  return { ...content, approval: { status: 'draft' } }
+}
+
 export function DocumentWorkspace({
-  documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate, onClose
+  documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate,
+  onSaveDocument, saveStatus, onClose
 }: DocumentWorkspaceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<{
     docx: 'idle' | 'loading' | 'success' | 'error'
     pdf: 'idle' | 'loading' | 'success' | 'error'
@@ -124,21 +134,21 @@ export function DocumentWorkspace({
 
   const handleSectionUpdate = useCallback((updatedSection: DocumentSection) => {
     if (!documentContent) return
-    const updated = {
+    const updated = resetApproval({
       ...documentContent,
       sections: documentContent.sections.map(s =>
         s.id === updatedSection.id ? updatedSection : s
       ),
-    }
+    })
     onDocumentUpdate(updated)
   }, [documentContent, onDocumentUpdate])
 
   const handleSectionDelete = useCallback((sectionId: string) => {
     if (!documentContent) return
-    const updated = {
+    const updated = resetApproval({
       ...documentContent,
       sections: documentContent.sections.filter(s => s.id !== sectionId),
-    }
+    })
     onDocumentUpdate(updated)
   }, [documentContent, onDocumentUpdate])
 
@@ -153,13 +163,44 @@ export function DocumentWorkspace({
     const idx = documentContent.sections.findIndex(s => s.id === afterId)
     const newSections = [...documentContent.sections]
     newSections.splice(idx + 1, 0, newSection)
-    onDocumentUpdate({ ...documentContent, sections: newSections })
+    onDocumentUpdate(resetApproval({ ...documentContent, sections: newSections }))
   }, [documentContent, onDocumentUpdate])
 
   const handleTitleChange = useCallback((title: string) => {
     if (!documentContent) return
-    onDocumentUpdate({ ...documentContent, title })
+    onDocumentUpdate(resetApproval({ ...documentContent, title }))
   }, [documentContent, onDocumentUpdate])
+
+  const handleIntakeFieldUpdate = useCallback((key: string, value: string) => {
+    if (!documentContent?.intake) return
+    const intake = {
+      ...documentContent.intake,
+      fields: { ...documentContent.intake.fields, [key]: value },
+    }
+    intake.missingFields = getMissingRequiredFields(intake)
+    onDocumentUpdate(resetApproval({ ...documentContent, intake }))
+  }, [documentContent, onDocumentUpdate])
+
+  const handleSaveLocally = async () => {
+    setSaveError(null)
+    try {
+      await onSaveDocument()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save this document locally.')
+    }
+  }
+
+  const missingRequiredFields = documentContent?.intake
+    ? getMissingRequiredFields(documentContent.intake)
+    : []
+
+  const handleApprovalToggle = () => {
+    if (!documentContent || (documentContent.approval?.status !== 'approved' && missingRequiredFields.length > 0)) return
+    const approval = documentContent.approval?.status === 'approved'
+      ? { status: 'draft' as const }
+      : { status: 'approved' as const, approvedAt: new Date().toISOString() }
+    onDocumentUpdate({ ...documentContent, approval })
+  }
 
   if (!documentContent) {
     return (
@@ -238,12 +279,56 @@ export function DocumentWorkspace({
             onSectionDelete={handleSectionDelete}
             onAddSection={handleAddSection}
             onTitleChange={handleTitleChange}
+            onIntakeFieldUpdate={handleIntakeFieldUpdate}
           />
         )}
       </div>
 
       {/* Export Panel */}
       <div className="border-t border-gray-200 px-4 py-3 bg-white">
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            onClick={handleSaveLocally}
+            disabled={saveStatus === 'saving'}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+          >
+            {saveStatus === 'saving' ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            {saveStatus === 'saving' ? 'Saving...' : 'Save locally'}
+          </button>
+          <button
+            onClick={handleApprovalToggle}
+            disabled={documentContent.approval?.status !== 'approved' && missingRequiredFields.length > 0}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-50 ${
+              documentContent.approval?.status === 'approved'
+                ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            <BadgeCheck size={14} />
+            {documentContent.approval?.status === 'approved' ? 'Reopen as draft' : 'Approve document'}
+          </button>
+        </div>
+        <div className="flex items-center justify-between mb-2 text-[10px]">
+          <span className={saveStatus === 'error' ? 'text-red-600' : 'text-gray-400'}>
+            {saveStatus === 'error'
+              ? saveError || 'Local save failed. Retry to save.'
+              : saveStatus === 'saving'
+                ? 'Saving changes locally...'
+                : saveStatus === 'saved'
+                  ? 'Saved locally'
+                  : 'Changes save to this device'}
+          </span>
+          <span className={documentContent.approval?.status === 'approved' ? 'text-green-700' : 'text-amber-700'}>
+            {documentContent.approval?.status === 'approved' ? 'Approved' : 'Draft - not approved'}
+          </span>
+        </div>
+        {missingRequiredFields.length > 0 && (
+          <p className="text-[10px] text-amber-700 mb-2">
+            Complete these required fields before approval: {missingRequiredFields
+              .map(key => getDocumentFieldLabel(documentContent.intake!.documentType, key))
+              .join(', ')}
+          </p>
+        )}
         <p className="text-xs font-semibold text-gray-600 mb-2">Export Document</p>
         <div className="flex gap-2">
           {/* DOCX Button */}
@@ -326,21 +411,32 @@ export function DocumentWorkspace({
 
 // Document Preview Component
 function DocumentPreview({ documentContent }: { documentContent: DocumentContent }) {
+  const documentType = documentContent.documentType
+  const documentLabel = documentType ? BUSINESS_DOCUMENT_TEMPLATES[documentType].label : 'Travel Document'
+
   return (
     <div className="p-6 max-w-2xl mx-auto">
       {/* Document Header Preview */}
       <div className="mb-6 pb-4 border-b border-gray-200">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
-            <span className="text-white text-[8px] font-bold">BE</span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-gray-800">BEYOND ESCAPES | SRI LANKA</p>
-            <p className="text-[9px] text-gray-500">Official Travel Itinerary</p>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <Image
+            src="/images/beyond_escapes_logo.png"
+            alt="Beyond Escapes"
+            width={220}
+            height={36}
+            className="h-9 w-auto object-contain object-left"
+          />
+          <div className="text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">{documentLabel}</p>
+            <p className="text-[9px] text-gray-500">Beyond Escapes | Sri Lanka</p>
           </div>
         </div>
         <h1 className="text-lg font-bold text-gray-900 font-serif">{documentContent.title}</h1>
       </div>
+
+      {documentContent.intake && (
+        <DocumentIntakePreview intake={documentContent.intake} />
+      )}
 
       {/* Sections */}
       <div className="space-y-1 doc-preview">
@@ -354,6 +450,94 @@ function DocumentPreview({ documentContent }: { documentContent: DocumentContent
         <p className="text-xs text-gray-500 font-medium">BEYOND ESCAPES | SRI LANKA</p>
       </div>
     </div>
+  )
+}
+
+function DocumentIntakePreview({ intake }: { intake: NonNullable<DocumentContent['intake']> }) {
+  const template = BUSINESS_DOCUMENT_TEMPLATES[intake.documentType]
+  const fields = template.fields.filter(field => intake.fields[field.key]?.trim())
+  const get = (key: string) => intake.fields[key]?.trim()
+
+  if (!fields.length) return null
+
+  if (intake.documentType === 'room_reservation') {
+    const guestFields = ['clientName', 'guestComposition', 'adults', 'children', 'infants']
+      .filter(key => get(key))
+    const stayFields = ['checkIn', 'checkOut', 'basis', 'roomAllocation', 'roomCategory', 'nights']
+      .filter(key => get(key))
+    const metadataFields = ['tourNumber', 'market', 'documentDate']
+      .filter(key => get(key))
+
+    return (
+      <div className="mb-5 text-xs text-gray-800">
+        {metadataFields.length > 0 && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3">
+            {metadataFields.map(key => (
+              <p key={key}><strong>{getDocumentFieldLabel(intake.documentType, key)}:</strong> {get(key)}</p>
+            ))}
+          </div>
+        )}
+        {(get('hotel') || get('location')) && (
+          <div className="mb-3">
+            {get('hotel') && <p><strong>Hotel:</strong> {get('hotel')}</p>}
+            {get('location') && <p><strong>Location:</strong> {get('location')}</p>}
+          </div>
+        )}
+        {guestFields.length > 0 && (
+          <table className="w-full border-collapse mb-3">
+            <tbody>
+              <tr className="bg-gray-100">
+                {guestFields.map(key => (
+                  <th key={key} className="border border-gray-400 px-2 py-1 text-left font-semibold uppercase">
+                    {getDocumentFieldLabel(intake.documentType, key)}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {guestFields.map(key => (
+                  <td key={key} className="border border-gray-400 px-2 py-1">{get(key)}</td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        )}
+        {stayFields.length > 0 && (
+          <table className="w-full border-collapse mb-3">
+            <tbody>
+              <tr className="bg-gray-100">
+                {stayFields.map(key => (
+                  <th key={key} className="border border-gray-400 px-2 py-1 text-left font-semibold uppercase">
+                    {getDocumentFieldLabel(intake.documentType, key)}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {stayFields.map(key => (
+                  <td key={key} className="border border-gray-400 px-2 py-1">{get(key)}</td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        )}
+        {get('remarks') && (
+          <div className="border border-gray-400">
+            <p className="bg-gray-100 px-2 py-1 font-semibold uppercase">Remarks</p>
+            <p className="px-3 py-2 whitespace-pre-wrap">{get('remarks')}</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <dl className="mb-5 grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-3 gap-y-1 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs">
+      {fields.map(field => (
+        <div key={field.key} className="contents">
+          <dt className="font-semibold text-gray-600">{field.label}</dt>
+          <dd className="min-w-0 text-gray-800 whitespace-pre-wrap break-words">{intake.fields[field.key]}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
@@ -453,15 +637,24 @@ function DocumentEditor({
   onSectionDelete,
   onAddSection,
   onTitleChange,
+  onIntakeFieldUpdate,
 }: {
   documentContent: DocumentContent
   onSectionUpdate: (section: DocumentSection) => void
   onSectionDelete: (id: string) => void
   onAddSection: (afterId: string, type: DocumentSection['type']) => void
   onTitleChange: (title: string) => void
+  onIntakeFieldUpdate: (key: string, value: string) => void
 }) {
   return (
     <div className="p-4 space-y-2">
+      {documentContent.intake && (
+        <StructuredFieldsEditor
+          intake={documentContent.intake}
+          onFieldUpdate={onIntakeFieldUpdate}
+        />
+      )}
+
       {/* Title Editor */}
       <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
         <span className="text-[10px] text-gray-400 uppercase tracking-wider mt-1 w-14 flex-shrink-0">Title</span>
@@ -491,6 +684,49 @@ function DocumentEditor({
         onAddSection(lastId, type)
       }} />
     </div>
+  )
+}
+
+function StructuredFieldsEditor({
+  intake,
+  onFieldUpdate,
+}: {
+  intake: NonNullable<DocumentContent['intake']>
+  onFieldUpdate: (key: string, value: string) => void
+}) {
+  const template = BUSINESS_DOCUMENT_TEMPLATES[intake.documentType]
+  const requiredKeys = new Set(template.requiredFields)
+  const fields = template.fields.filter(field => requiredKeys.has(field.key) || intake.fields[field.key]?.trim())
+
+  return (
+    <section className="p-3 bg-blue-50/60 rounded-xl border border-blue-100">
+      <div className="mb-2">
+        <h3 className="text-xs font-semibold text-blue-900">Extracted {template.label} details</h3>
+        <p className="text-[10px] text-blue-700">Edit these structured fields before approval or export.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {fields.map(field => (
+          <label key={field.key} className="block">
+            <span className="block text-[10px] font-medium text-gray-600 mb-1">
+              {field.label}{requiredKeys.has(field.key) ? ' *' : ''}
+            </span>
+            <textarea
+              value={intake.fields[field.key] || ''}
+              onChange={event => onFieldUpdate(field.key, event.target.value)}
+              rows={field.key === 'keyPoints' || field.key === 'lineItems' || field.key === 'remarks' ? 3 : 1}
+              className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            />
+          </label>
+        ))}
+      </div>
+      {intake.missingFields.length > 0 && (
+        <p className="mt-2 text-[10px] text-amber-700">
+          Required details still missing: {intake.missingFields
+            .map(key => getDocumentFieldLabel(intake.documentType, key))
+            .join(', ')}
+        </p>
+      )}
+    </section>
   )
 }
 

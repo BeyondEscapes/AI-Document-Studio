@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
-import type { DocumentContent, DocumentSection } from '@/types'
+import { BUSINESS_DOCUMENT_TEMPLATES, normalizeDocumentIntake } from '@/lib/business-documents'
+import type { DocumentContent, DocumentSection, DocumentIntake } from '@/types'
 
 function getClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY
@@ -9,80 +10,25 @@ function getClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey })
 }
 
-const SYSTEM_PROMPT = `You are an expert travel document writer and AI assistant for "Beyond Escapes Sri Lanka", a premium travel company.
+const SYSTEM_PROMPT = `You are the real AI assistant and document writer for Beyond Escapes Sri Lanka. Use the user's request and conversation history to identify the document type, extract supplied facts into structured fields, ask for missing essentials, and generate documents using the matching template.
 
-Your primary role is to help create professional travel documents including:
-- Itineraries (day-by-day travel plans)
-- Tour proposals and quotes
-- Welcome letters
-- Travel guides
-- Activity descriptions
-- Hotel information sheets
+SUPPORTED TEMPLATES AND FIELDS:
+${Object.entries(BUSINESS_DOCUMENT_TEMPLATES).map(([type, template]) => `- ${type} (${template.label}); fields: ${template.fields.map(field => `${field.key} (${field.label})`).join(', ')}; required: ${template.requiredFields.map(key => `${key} (${template.fields.find(field => field.key === key)?.label ?? key}`).join(', ')}. ${template.layout}`).join('\n')}
 
-When generating document content, ALWAYS respond with valid JSON in this exact format:
-{
-  "message": "A brief friendly response to the user",
-  "documentContent": {
-    "title": "Document Title",
-    "sections": [
-      {
-        "id": "unique-id",
-        "type": "heading1",
-        "content": "Section heading text"
-      },
-      {
-        "id": "unique-id",
-        "type": "paragraph",
-        "content": "Paragraph text"
-      },
-      {
-        "id": "unique-id",
-        "type": "bullet_list",
-        "content": "",
-        "items": ["Item 1", "Item 2", "Item 3"]
-      },
-      {
-        "id": "unique-id",
-        "type": "heading2",
-        "content": "Day heading - White text on blue bar in final document"
-      }
-    ],
-    "metadata": {
-      "generatedAt": "ISO date string",
-      "prompt": "original user prompt",
-      "language": "English",
-      "tone": "professional"
-    }
-  }
-}
+DOCUMENT RULES:
+- For a separate/new document, set isNewDocument=true and start with fresh fields; never reuse an earlier document's facts. Set isNewDocument=false for a clarification, revision, or continuation. In a continuation, merge the latest intake with corrected/new facts.
+- For document requests, return the exact supported documentType and a fields object using that template's keys. Include only facts stated by the user; use an empty string for unknown values.
+- If any required field is missing, set documentContent to null and ask a concise question naming the missing fields. The server independently validates these fields before generating.
+- Never invent guest identities, booking or tour references, reservation/transport confirmation status, prices, currencies, totals, tax, invoice identifiers, or travel/issue/due dates. Never calculate invoice totals. Only describe a booking or service as confirmed when the supplied status explicitly confirms it.
+- Itineraries and proposals may include suggestions, but label them as suggestions and never present them as booked services.
+- Preserve the user's language. Use a professional tone and Beyond Escapes branding. For edits, retain the document type and structured details unless the user changes them.
 
-SECTION TYPES:
-- "title": Document title (large, centered)
-- "heading1": Section separator (blue bar with white text in Word template - use for Day headings like "Day 01 | Arrival – Colombo | Leisure")
-- "heading2": Sub-section heading (bold, underlined in Word template - use for attraction names)
-- "heading3": Minor heading (bold)
-- "paragraph": Regular text paragraph
-- "bullet_list": Bullet points with "items" array
-- "numbered_list": Numbered list with "items" array  
-- "table": Data table with "headers" and "rows" arrays
-- "page_break": Insert page break (content is empty string)
+Always return valid JSON without markdown fences:
+{"message":"...","isNewDocument":false,"documentIntake":{"documentType":"supported key","fields":{"fieldKey":"user-provided value"}},"documentContent":null}
 
-FORMATTING RULES:
-- Use "heading1" for day headings in itineraries: "Day 01 | Location | Activities"
-- Use bullet_list for daily activity summaries
-- Use "heading2" for attraction/place descriptions
-- Use "paragraph" for detailed descriptions
-- Do NOT invent specific prices, hotel names, booking references, or personal details
-- Write in a professional, warm, travel-industry tone
-- Preserve the user's requested language
+When all required fields are present, set documentContent to {"title":"Document title","sections":[{"id":"unique-id","type":"heading1","content":"Section heading"},{"id":"unique-id","type":"paragraph","content":"Document text"},{"id":"unique-id","type":"bullet_list","content":"","items":["Item"]},{"id":"unique-id","type":"table","content":"","headers":["Column"],"rows":[["Value"]]}],"metadata":{"language":"English","tone":"professional"}}. Supported section types: title, heading1 (brand-blue section bar), heading2 (underlined subheading), heading3, paragraph, bullet_list, numbered_list, table, page_break. Keep sections focused and do not invent facts or duplicate structured details.
 
-For NON-DOCUMENT queries (general questions, clarifications, greetings):
-{
-  "message": "Your response text here",
-  "documentContent": null
-}
-
-IMPORTANT: Always respond with valid JSON. Never include markdown code blocks in your JSON response.`
+For general questions or greetings that are not document requests, return {"message":"Response text","isNewDocument":false,"documentIntake":null,"documentContent":null}.`
 
 // Fallback models in priority order if a model experiences 503 high demand or 429
 export const AVAILABLE_MODELS = [
@@ -105,7 +51,12 @@ export async function generateDocumentContent(
   userMessage: string,
   conversationHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
   requestedModel: string = 'gemini-3.5-flash'
-): Promise<{ message: string; documentContent: DocumentContent | null }> {
+): Promise<{
+  message: string
+  documentContent: DocumentContent | null
+  documentIntake: DocumentIntake | null
+  isNewDocument: boolean
+}> {
   const client = getClient()
   const primaryModel = normalizeModel(requestedModel)
 
@@ -125,7 +76,7 @@ export async function generateDocumentContent(
           model: modelToTry,
           config: {
             systemInstruction: SYSTEM_PROMPT,
-            temperature: 0.7,
+            temperature: 0.3,
             maxOutputTokens: 8192,
           },
           history: conversationHistory,
@@ -137,24 +88,21 @@ export async function generateDocumentContent(
         // Parse JSON response
         try {
           const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-          const parsed = JSON.parse(cleaned)
-          
-          const documentContent = parsed.documentContent
-          if (documentContent && documentContent.sections) {
-            documentContent.sections = documentContent.sections.map((section: DocumentSection, index: number) => ({
-              ...section,
-              id: section.id || `section-${index}-${Date.now()}`,
-            }))
-          }
-          
+          const parsed = JSON.parse(cleaned) as Record<string, unknown>
+          const documentIntake = normalizeDocumentIntake(parsed.documentIntake)
+
           return {
-            message: parsed.message || 'Content generated successfully.',
-            documentContent: documentContent || null,
+            message: typeof parsed.message === 'string' ? parsed.message : 'Please describe the document you need.',
+            documentContent: normalizeDocumentContent(parsed.documentContent, userMessage, documentIntake),
+            documentIntake,
+            isNewDocument: parsed.isNewDocument === true,
           }
         } catch {
           return {
             message: text,
             documentContent: null,
+            documentIntake: null,
+            isNewDocument: false,
           }
         }
       } catch (err: any) {
@@ -185,6 +133,63 @@ export async function generateDocumentContent(
   }
 
   throw new Error(`AI generation failed: ${errMsg}`)
+}
+
+function normalizeDocumentContent(
+  value: unknown,
+  prompt: string,
+  intake: DocumentIntake | null
+): DocumentContent | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Record<string, unknown>
+  if (typeof candidate.title !== 'string' || !Array.isArray(candidate.sections)) return null
+
+  const sectionTypes: DocumentSection['type'][] = [
+    'title', 'heading1', 'heading2', 'heading3', 'paragraph',
+    'bullet_list', 'numbered_list', 'table', 'page_break',
+  ]
+  const sections: DocumentSection[] = candidate.sections.flatMap((section: unknown, index: number) => {
+    if (!section || typeof section !== 'object') return []
+    const source = section as Record<string, unknown>
+    if (typeof source.type !== 'string' || !sectionTypes.includes(source.type as DocumentSection['type'])) return []
+
+    return [{
+      id: typeof source.id === 'string' && source.id ? source.id : `section-${index}-${Date.now()}`,
+      type: source.type as DocumentSection['type'],
+      content: typeof source.content === 'string' ? source.content : '',
+      ...(Array.isArray(source.items)
+        ? { items: source.items.filter((item): item is string => typeof item === 'string') }
+        : {}),
+      ...(Array.isArray(source.headers)
+        ? { headers: source.headers.filter((header): header is string => typeof header === 'string') }
+        : {}),
+      ...(Array.isArray(source.rows)
+        ? {
+            rows: source.rows
+              .filter((row): row is unknown[] => Array.isArray(row))
+              .map(row => row.map(cell => typeof cell === 'string' ? cell : String(cell ?? ''))),
+          }
+        : {}),
+    }]
+  })
+  if (!sections.length) return null
+
+  const sourceMetadata = candidate.metadata && typeof candidate.metadata === 'object'
+    ? candidate.metadata as Record<string, unknown>
+    : {}
+
+  return {
+    title: candidate.title,
+    sections,
+    ...(intake ? { documentType: intake.documentType, intake } : {}),
+    approval: { status: 'draft' },
+    metadata: {
+      generatedAt: new Date().toISOString(),
+      prompt,
+      ...(typeof sourceMetadata.language === 'string' ? { language: sourceMetadata.language } : {}),
+      ...(typeof sourceMetadata.tone === 'string' ? { tone: sourceMetadata.tone } : {}),
+    },
+  }
 }
 
 export async function streamGenerateContent(

@@ -11,12 +11,35 @@ export interface DocumentSection {
 export interface DocumentContent {
   title: string
   sections: DocumentSection[]
+  documentType?: BusinessDocumentType
+  intake?: DocumentIntake
+  approval?: {
+    status: 'draft' | 'approved'
+    approvedAt?: string
+  }
   metadata: {
     generatedAt: string
     prompt: string
     language?: string
     tone?: string
   }
+}
+
+export type BusinessDocumentType =
+  | 'room_reservation'
+  | 'hotel_voucher'
+  | 'tour_itinerary'
+  | 'invoice'
+  | 'transport_confirmation'
+  | 'rooming_list'
+  | 'business_letter'
+  | 'tour_proposal'
+  | 'other_business_document'
+
+export interface DocumentIntake {
+  documentType: BusinessDocumentType
+  fields: Record<string, string>
+  missingFields: string[]
 }
 
 // Chat types
@@ -26,6 +49,7 @@ export interface ChatMessage {
   content: string
   timestamp: string
   documentContent?: DocumentContent
+  documentIntake?: DocumentIntake
   isLoading?: boolean
 }
 
