@@ -413,11 +413,12 @@ export function DocumentWorkspace({
 function DocumentPreview({ documentContent }: { documentContent: DocumentContent }) {
   const documentType = documentContent.documentType
   const documentLabel = documentType ? BUSINESS_DOCUMENT_TEMPLATES[documentType].label : 'Travel Document'
+  const isRoomReservation = documentType === 'room_reservation'
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
       {/* Document Header Preview */}
-      <div className="mb-6 pb-4 border-b border-gray-200">
+      <div className={`mb-6 ${isRoomReservation ? 'pb-3' : 'pb-4 border-b border-gray-200'}`}>
         <div className="flex items-center justify-between gap-3 mb-3">
           <Image
             src="/images/beyond_escapes_logo.png"
@@ -426,15 +427,17 @@ function DocumentPreview({ documentContent }: { documentContent: DocumentContent
             height={36}
             className="h-9 w-auto object-contain object-left"
           />
-          <div className="text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">{documentLabel}</p>
-            <p className="text-[9px] text-gray-500">Beyond Escapes | Sri Lanka</p>
-          </div>
+          {isRoomReservation
+            ? <Image src="/images/beyond_escapes_icon.png" alt="Beyond Escapes" width={42} height={42} className="h-9 w-9 object-contain" />
+            : <div className="text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">{documentLabel}</p>
+                <p className="text-[9px] text-gray-500">Beyond Escapes | Sri Lanka</p>
+              </div>}
         </div>
-        <h1 className="text-lg font-bold text-gray-900 font-serif">{documentContent.title}</h1>
+        {!isRoomReservation && <h1 className="text-lg font-bold text-gray-900 font-serif">{documentContent.title}</h1>}
       </div>
 
-      {documentContent.intake && (
+      {documentContent.intake && documentContent.documentType !== 'tour_itinerary' && (
         <DocumentIntakePreview intake={documentContent.intake} />
       )}
 
@@ -461,70 +464,95 @@ function DocumentIntakePreview({ intake }: { intake: NonNullable<DocumentContent
   if (!fields.length) return null
 
   if (intake.documentType === 'room_reservation') {
-    const guestFields = ['clientName', 'guestComposition', 'adults', 'children', 'infants']
-      .filter(key => get(key))
-    const stayFields = ['checkIn', 'checkOut', 'basis', 'roomAllocation', 'roomCategory', 'nights']
-      .filter(key => get(key))
-    const metadataFields = ['tourNumber', 'market', 'documentDate']
-      .filter(key => get(key))
+    const roomCount = (field: string, code: string, fullName: string) => {
+      const value = get(field)
+      if (value) return value
+      const allocation = get('roomAllocation') || ''
+      const match = new RegExp(`(?:\\b(\\d+)\\s*(?:${code}|${fullName})\\b|\\b(?:${code}|${fullName})\\s*[:= -]?\\s*(\\d+)\\b)`, 'i')
+        .exec(allocation)
+      return match?.[1] || match?.[2]?.padStart(2, '0') || ''
+    }
+    const metadataFields = [
+      ['Tour Number', 'tourNumber'],
+      ['Market', 'market'],
+      ['Date', 'documentDate'],
+    ] as const
 
     return (
-      <div className="mb-5 text-xs text-gray-800">
-        {metadataFields.length > 0 && (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3">
-            {metadataFields.map(key => (
-              <p key={key}><strong>{getDocumentFieldLabel(intake.documentType, key)}:</strong> {get(key)}</p>
+      <div className="mb-5 text-[12px] leading-[1.25] text-gray-900 font-sans">
+        <h1 className="mb-10 text-center text-base font-bold tracking-wide">ROOM RESERVATION</h1>
+        <div className="mb-5">
+          {metadataFields.filter(([, key]) => get(key)).map(([label, key]) => (
+            <p key={key}><strong>{label}:</strong> {get(key)}</p>
+          ))}
+          {(get('hotel') || get('location')) && (
+            <div className="mt-8">
+              {get('hotel') && <p><strong>Hotel:</strong> {get('hotel')}</p>}
+              {get('location') && <p><strong>Location:</strong> {get('location')}</p>}
+            </div>
+          )}
+        </div>
+        <table className="w-full table-fixed border-collapse border border-black text-[10px]">
+          <colgroup>
+            {[15.42, 33.64, 12.48, 7.79, 9.35, 7.4, 9.61, 4.29].map((width, index) => (
+              <col key={index} style={{ width: `${width}%` }} />
             ))}
-          </div>
-        )}
-        {(get('hotel') || get('location')) && (
-          <div className="mb-3">
-            {get('hotel') && <p><strong>Hotel:</strong> {get('hotel')}</p>}
-            {get('location') && <p><strong>Location:</strong> {get('location')}</p>}
-          </div>
-        )}
-        {guestFields.length > 0 && (
-          <table className="w-full border-collapse mb-3">
-            <tbody>
-              <tr className="bg-gray-100">
-                {guestFields.map(key => (
-                  <th key={key} className="border border-gray-400 px-2 py-1 text-left font-semibold uppercase">
-                    {getDocumentFieldLabel(intake.documentType, key)}
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                {guestFields.map(key => (
-                  <td key={key} className="border border-gray-400 px-2 py-1">{get(key)}</td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        )}
-        {stayFields.length > 0 && (
-          <table className="w-full border-collapse mb-3">
-            <tbody>
-              <tr className="bg-gray-100">
-                {stayFields.map(key => (
-                  <th key={key} className="border border-gray-400 px-2 py-1 text-left font-semibold uppercase">
-                    {getDocumentFieldLabel(intake.documentType, key)}
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                {stayFields.map(key => (
-                  <td key={key} className="border border-gray-400 px-2 py-1">{get(key)}</td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        )}
-        {get('remarks') && (
-          <div className="border border-gray-400">
-            <p className="bg-gray-100 px-2 py-1 font-semibold uppercase">Remarks</p>
-            <p className="px-3 py-2 whitespace-pre-wrap">{get('remarks')}</p>
-          </div>
-        )}
+          </colgroup>
+          <tbody>
+            <tr>
+              {[
+                ['CLIENT NAME', get('clientName')],
+                ['ADULT', get('adults')],
+                ['CHILD', get('children')],
+                ['INFANT', get('infants')],
+              ].flatMap(([label, value]) => [
+                <th key={`${label}-label`} className="border border-black bg-[#D9D9D9] px-1 py-1 text-left font-bold whitespace-nowrap">{label}</th>,
+                <td key={`${label}-value`} className="border border-black px-1 py-1">{value || ''}</td>,
+              ])}
+            </tr>
+          </tbody>
+        </table>
+
+        <table className="mt-4 w-full table-fixed border-collapse border border-black text-center text-[10px]">
+          <colgroup>
+            {[19.57, 18.18, 7.22, 6.49, 6.49, 6.49, 6.49, 18.18, 10.88].map((width, index) => (
+              <col key={index} style={{ width: `${width}%` }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {['CHECK-IN', 'CHECK-OUT', 'BASIS', 'SGL', 'DBL', 'TWN', 'TPL', 'ROOM CATEGORY', 'NIGHTS'].map(label => (
+                <th key={label} className="border border-black bg-[#D9D9D9] px-1 py-1 font-bold whitespace-nowrap">{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {[
+                get('checkIn'),
+                get('checkOut'),
+                get('basis'),
+                roomCount('singleRooms', 'SGL', 'SINGLES?'),
+                roomCount('doubleRooms', 'DBL', 'DOUBLES?'),
+                roomCount('twinRooms', 'TWN', 'TWINS?'),
+                roomCount('tripleRooms', 'TPL', 'TRIPLES?'),
+                get('roomCategory'),
+                get('nights'),
+              ].map((value, index) => (
+                <td key={index} className="border border-black px-1 py-1">{value || ''}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="mt-9 border border-black">
+          <h2 className="bg-[#D9D9D9] px-2 py-1 text-[10px] font-bold">REMARKS:</h2>
+          <ul className="list-disc space-y-0.5 px-7 py-2 text-[11px]">
+            {(get('remarks') || '').split(/\r?\n/).filter(line => line.trim()).map((line, index) => (
+              <li key={index}>{line.trim().replace(/^[•*-]\s*/, '')}</li>
+            ))}
+          </ul>
+        </div>
       </div>
     )
   }

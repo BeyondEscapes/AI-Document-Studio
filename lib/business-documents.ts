@@ -23,7 +23,7 @@ export const BUSINESS_DOCUMENT_TEMPLATES: Record<BusinessDocumentType, BusinessD
       'clientName',
       'checkIn',
       'checkOut',
-      'guestComposition',
+      'adults',
       'basis',
       'roomCategory',
       'roomAllocation',
@@ -38,7 +38,6 @@ export const BUSINESS_DOCUMENT_TEMPLATES: Record<BusinessDocumentType, BusinessD
       { key: 'adults', label: 'Adults' },
       { key: 'children', label: 'Children' },
       { key: 'infants', label: 'Infants' },
-      { key: 'guestComposition', label: 'Guest Composition' },
       { key: 'checkIn', label: 'Check-in' },
       { key: 'checkOut', label: 'Check-out' },
       { key: 'basis', label: 'Basis' },
@@ -51,7 +50,7 @@ export const BUSINESS_DOCUMENT_TEMPLATES: Record<BusinessDocumentType, BusinessD
       { key: 'nights', label: 'Nights' },
       { key: 'remarks', label: 'Remarks' },
     ],
-    layout: 'Match the supplied Earls Regent room reservation reference: a centered ROOM RESERVATION title; tour number, market, and document date only when supplied; hotel and location; a compact client and guest-composition table; a stay table for check-in, check-out, basis, room counts/allocation, room category, and nights; and a remarks list. Never fill omitted values with guesses.',
+    layout: 'Match the supplied Earls Regent room reservation reference: a centered ROOM RESERVATION title; tour number, market, and date; hotel and location; a fixed guest table for client name and adult, child, and infant counts; a fixed nine-column stay table for check-in, check-out, basis, SGL, DBL, TWN, TPL, room category, and nights; and a bordered remarks list. Extract room allocations into the four matching room-count fields when explicitly given; otherwise leave those values blank. Never fill omitted values with guesses.',
   },
   hotel_voucher: {
     label: 'Hotel Voucher',
@@ -219,7 +218,7 @@ function normalizeFieldValue(value: unknown): string {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   if (typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) {
-    return value.map(normalizeFieldValue).filter(Boolean).join('; ')
+    return value.map(normalizeFieldValue).filter(Boolean).join('\n')
   }
   if (value && typeof value === 'object') {
     return Object.entries(value as Record<string, unknown>)
@@ -228,7 +227,7 @@ function normalizeFieldValue(value: unknown): string {
         return normalized ? `${key}: ${normalized}` : ''
       })
       .filter(Boolean)
-      .join('; ')
+      .join('\n')
   }
   return ''
 }

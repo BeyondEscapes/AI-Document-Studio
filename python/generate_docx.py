@@ -13,12 +13,14 @@ import json
 import shutil
 import os
 import copy
+import re
 from pathlib import Path
 
 try:
     from docx import Document
-    from docx.shared import Pt, RGBColor, Cm, Emu
+    from docx.shared import Pt, RGBColor, Cm, Emu, Inches
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
     import lxml.etree as etree
@@ -237,11 +239,12 @@ def add_room_reservation_reference(doc, fields):
     """Render the structured reservation details in the supplied PDF's table layout."""
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.paragraph_format.space_after = Pt(14)
+    title.paragraph_format.space_before = Pt(25)
+    title.paragraph_format.space_after = Pt(44)
     title_run = title.add_run('ROOM RESERVATION')
-    title_run.font.name = 'Times New Roman'
+    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(14)
+    title_run.font.size = Pt(16)
 
     metadata = [
         ('Tour Number', fields.get('tourNumber')),
@@ -251,95 +254,237 @@ def add_room_reservation_reference(doc, fields):
     for label, value in metadata:
         if value:
             paragraph = doc.add_paragraph()
-            paragraph.paragraph_format.space_after = Pt(1)
-            run = paragraph.add_run(f'{label}: {value}')
-            run.font.name = 'Times New Roman'
+            paragraph.paragraph_format.space_before = Pt(0)
+            paragraph.paragraph_format.space_after = Pt(0)
+            label_run = paragraph.add_run(f'{label}: ')
+            label_run.font.name = 'Calibri'
+            label_run.font.bold = True
+            label_run.font.size = Pt(10)
+            run = paragraph.add_run(value)
+            run.font.name = 'Calibri'
             run.font.size = Pt(10)
 
     for label, key in [('Hotel', 'hotel'), ('Location', 'location')]:
         if fields.get(key):
             paragraph = doc.add_paragraph()
-            paragraph.paragraph_format.space_before = Pt(10 if key == 'hotel' else 0)
-            paragraph.paragraph_format.space_after = Pt(1)
-            run = paragraph.add_run(f'{label}: {fields[key]}')
-            run.font.name = 'Times New Roman'
+            paragraph.paragraph_format.space_before = Pt(28 if key == 'hotel' else 0)
+            paragraph.paragraph_format.space_after = Pt(0)
+            label_run = paragraph.add_run(f'{label}: ')
+            label_run.font.name = 'Calibri'
+            label_run.font.bold = True
+            label_run.font.size = Pt(10)
+            run = paragraph.add_run(fields[key])
+            run.font.name = 'Calibri'
             run.font.size = Pt(10)
 
-    guest_fields = [
-        ('CLIENT NAME', 'clientName'),
-        ('GUESTS', 'guestComposition'),
-        ('ADULT', 'adults'),
-        ('CHILD', 'children'),
-        ('INFANT', 'infants'),
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_before = Pt(14)
+    spacer.paragraph_format.space_after = Pt(0)
+    guest_values = [
+        fields.get('clientName', ''),
+        fields.get('adults', ''),
+        fields.get('children', ''),
+        fields.get('infants', ''),
     ]
-    guest_headers = [label for label, key in guest_fields if fields.get(key)]
-    guest_values = [fields[key] for _, key in guest_fields if fields.get(key)]
-    if guest_headers:
-        add_reservation_table(doc, guest_headers, [guest_values])
-
-    stay_fields = [
-        ('CHECK-IN', 'checkIn'),
-        ('CHECK-OUT', 'checkOut'),
-        ('BASIS', 'basis'),
-    ]
-    room_count_fields = [
-        ('SGL', 'singleRooms'),
-        ('DBL', 'doubleRooms'),
-        ('TWN', 'twinRooms'),
-        ('TPL', 'tripleRooms'),
-    ]
-    if any(fields.get(key) for _, key in room_count_fields):
-        stay_fields.extend(room_count_fields)
-    else:
-        stay_fields.append(('ROOM ALLOCATION', 'roomAllocation'))
-    stay_fields.extend([('ROOM CATEGORY', 'roomCategory'), ('NIGHTS', 'nights')])
-    stay_headers = [label for label, key in stay_fields if fields.get(key)]
-    stay_values = [fields[key] for _, key in stay_fields if fields.get(key)]
-    if stay_headers:
-        add_reservation_table(doc, stay_headers, [stay_values])
-
-    if fields.get('remarks'):
-        remarks_heading = doc.add_paragraph()
-        remarks_heading.paragraph_format.space_before = Pt(12)
-        remarks_heading.paragraph_format.space_after = Pt(2)
-        run = remarks_heading.add_run('REMARKS:')
-        run.font.name = 'Times New Roman'
-        run.font.bold = True
-        run.font.size = Pt(10)
-        for remark in fields['remarks'].splitlines():
-            if remark.strip():
-                add_bullet_paragraph(doc, remark.strip().lstrip('•-* ').strip())
-
-
-def add_reservation_table(doc, headers, rows):
-    """Create the compact, bordered gray-header tables used in the PDF reference."""
-    table = doc.add_table(rows=1 + len(rows), cols=len(headers))
-    table.style = 'Table Grid'
-    table.autofit = True
-
-    for column, header in enumerate(headers):
-        cell = table.rows[0].cells[column]
-        cell.text = ''
-        shading = OxmlElement('w:shd')
-        shading.set(qn('w:val'), 'clear')
-        shading.set(qn('w:color'), 'auto')
-        shading.set(qn('w:fill'), 'E5E7EB')
-        cell._tc.get_or_add_tcPr().append(shading)
-        run = cell.paragraphs[0].add_run(header)
-        run.font.name = 'Times New Roman'
-        run.font.bold = True
-        run.font.size = Pt(8)
-
-    for row_index, values in enumerate(rows, start=1):
-        for column, value in enumerate(values):
-            cell = table.rows[row_index].cells[column]
-            cell.text = ''
-            run = cell.paragraphs[0].add_run(str(value))
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(9)
+    add_reservation_guest_table(doc, guest_values)
 
     spacer = doc.add_paragraph()
-    spacer.paragraph_format.space_after = Pt(2)
+    spacer.paragraph_format.space_before = Pt(12)
+    spacer.paragraph_format.space_after = Pt(0)
+    room_counts = [
+        reservation_room_count(fields, 'singleRooms', 'SGL'),
+        reservation_room_count(fields, 'doubleRooms', 'DBL'),
+        reservation_room_count(fields, 'twinRooms', 'TWN'),
+        reservation_room_count(fields, 'tripleRooms', 'TPL'),
+    ]
+    add_reservation_stay_table(doc, [
+        fields.get('checkIn', ''),
+        fields.get('checkOut', ''),
+        fields.get('basis', ''),
+        *room_counts,
+        fields.get('roomCategory', ''),
+        fields.get('nights', ''),
+    ])
+
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_before = Pt(26)
+    spacer.paragraph_format.space_after = Pt(0)
+    add_reservation_remarks_table(doc, fields.get('remarks', ''))
+
+
+RESERVATION_CONTENT_WIDTH = Inches(7.7)
+RESERVATION_GUEST_WIDTHS = [1.1875, 2.5903, 0.9611, 0.6, 0.7201, 0.5701, 0.7403, 0.3306]
+RESERVATION_STAY_WIDTHS = [1.5069, 1.4, 0.5556, 0.5, 0.5, 0.5, 0.5, 1.4, 0.8375]
+
+
+def set_reservation_header_branding(doc):
+    for section in doc.sections:
+        for anchor in section.header._element.xpath('.//wp:anchor'):
+            extent = anchor.find(qn('wp:extent'))
+            if extent is None:
+                continue
+            width = int(extent.get('cx', '0'))
+            scale = 1.7 if width > 1_000_000 else 1.52
+            extent.set('cx', str(round(width * scale)))
+            extent.set('cy', str(round(int(extent.get('cy', '0')) * scale)))
+
+            position_h = anchor.find(qn('wp:positionH'))
+            position_v = anchor.find(qn('wp:positionV'))
+            horizontal_offset = position_h.find(qn('wp:posOffset')) if position_h is not None else None
+            vertical_offset = position_v.find(qn('wp:posOffset')) if position_v is not None else None
+            if horizontal_offset is not None:
+                horizontal_offset.text = '9144' if width > 1_000_000 else '6208776'
+            if vertical_offset is not None:
+                vertical_offset.text = '-178308' if width > 1_000_000 else '-612648'
+
+
+def set_reservation_cell_shading(cell, fill):
+    shading = OxmlElement('w:shd')
+    shading.set(qn('w:val'), 'clear')
+    shading.set(qn('w:color'), 'auto')
+    shading.set(qn('w:fill'), fill)
+    cell._tc.get_or_add_tcPr().append(shading)
+
+
+def set_reservation_cell_margins(cell, top=30, start=35, bottom=30, end=35):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    margins = OxmlElement('w:tcMar')
+    for edge, value in [('top', top), ('start', start), ('bottom', bottom), ('end', end)]:
+        margin = OxmlElement(f'w:{edge}')
+        margin.set(qn('w:w'), str(value))
+        margin.set(qn('w:type'), 'dxa')
+        margins.append(margin)
+    tc_pr.append(margins)
+
+
+def set_reservation_table_borders(table):
+    properties = table._tbl.tblPr
+    borders = properties.find(qn('w:tblBorders'))
+    if borders is None:
+        borders = OxmlElement('w:tblBorders')
+        properties.append(borders)
+    for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+        border = borders.find(qn(f'w:{edge}'))
+        if border is None:
+            border = OxmlElement(f'w:{edge}')
+            borders.append(border)
+        border.set(qn('w:val'), 'single')
+        border.set(qn('w:sz'), '6')
+        border.set(qn('w:space'), '0')
+        border.set(qn('w:color'), '000000')
+
+
+def set_reservation_table_widths(table, widths):
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    table_properties = table._tbl.tblPr
+    table_width = table_properties.find(qn('w:tblW'))
+    if table_width is None:
+        table_width = OxmlElement('w:tblW')
+        table_properties.append(table_width)
+    table_width.set(qn('w:w'), str(int(RESERVATION_CONTENT_WIDTH.twips)))
+    table_width.set(qn('w:type'), 'dxa')
+
+    grid = table._tbl.tblGrid
+    for child in list(grid):
+        grid.remove(child)
+    for width in widths:
+        column = OxmlElement('w:gridCol')
+        column.set(qn('w:w'), str(int(Inches(width).twips)))
+        grid.append(column)
+
+    for row in table.rows:
+        for index, cell in enumerate(row.cells):
+            cell.width = Inches(widths[index])
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            set_reservation_cell_margins(cell)
+    set_reservation_table_borders(table)
+
+
+def format_reservation_cell(cell, text, *, bold=False, size=9, fill=None, alignment=WD_ALIGN_PARAGRAPH.LEFT):
+    cell.text = ''
+    if fill:
+        set_reservation_cell_shading(cell, fill)
+    paragraph = cell.paragraphs[0]
+    paragraph.alignment = alignment
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+    run = paragraph.add_run(str(text))
+    run.font.name = 'Calibri'
+    run.font.bold = bold
+    run.font.size = Pt(size)
+
+
+def add_reservation_guest_table(doc, values):
+    table = doc.add_table(rows=1, cols=8)
+    widths = RESERVATION_GUEST_WIDTHS
+    labels = ['CLIENT NAME', 'ADULT', 'CHILD', 'INFANT']
+    for index, (label, value) in enumerate(zip(labels, values)):
+        format_reservation_cell(table.rows[0].cells[index * 2], label, bold=True, size=9, fill='D9D9D9')
+        format_reservation_cell(table.rows[0].cells[index * 2 + 1], value, size=10)
+    set_reservation_table_widths(table, widths)
+
+
+def reservation_room_count(fields, field_name, abbreviation):
+    value = fields.get(field_name, '')
+    if value:
+        return value
+
+    allocation = fields.get('roomAllocation', '')
+    if not isinstance(allocation, str) or not allocation:
+        return ''
+
+    label = r'(?:' + abbreviation + r'|' + {
+        'SGL': r'SINGLES?',
+        'DBL': r'DOUBLES?',
+        'TWN': r'TWINS?',
+        'TPL': r'TRIPLES?',
+    }[abbreviation] + r')'
+    patterns = [
+        rf'\b(\d+)\s*{label}\b',
+        rf'\b{label}\s*[:= -]?\s*(\d+)\b',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, allocation, re.IGNORECASE)
+        if match:
+            return match.group(1).zfill(2)
+    return ''
+
+
+def add_reservation_stay_table(doc, values):
+    headers = ['CHECK-IN', 'CHECK-OUT', 'BASIS', 'SGL', 'DBL', 'TWN', 'TPL', 'ROOM CATEGORY', 'NIGHTS']
+    table = doc.add_table(rows=2, cols=9)
+    widths = RESERVATION_STAY_WIDTHS
+    for index, header in enumerate(headers):
+        format_reservation_cell(table.rows[0].cells[index], header, bold=True, size=9, fill='D9D9D9', alignment=WD_ALIGN_PARAGRAPH.CENTER)
+        format_reservation_cell(table.rows[1].cells[index], values[index], size=10, alignment=WD_ALIGN_PARAGRAPH.CENTER)
+    set_reservation_table_widths(table, widths)
+
+
+def add_reservation_remarks_table(doc, remarks):
+    table = doc.add_table(rows=2, cols=1)
+    table.autofit = False
+    format_reservation_cell(table.rows[0].cells[0], 'REMARKS:', bold=True, size=9, fill='D9D9D9')
+
+    cell = table.rows[1].cells[0]
+    cell.text = ''
+    set_reservation_cell_margins(cell, top=80, start=220, bottom=80, end=80)
+    remark_lines = remarks.splitlines() if isinstance(remarks, str) else []
+    if not remark_lines and isinstance(remarks, str) and remarks.strip():
+        remark_lines = [remarks]
+    for index, line in enumerate(remark_lines):
+        if not line.strip():
+            continue
+        paragraph = cell.paragraphs[0] if index == 0 else cell.add_paragraph()
+        paragraph.paragraph_format.left_indent = Pt(8)
+        paragraph.paragraph_format.first_line_indent = Pt(-7)
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(2)
+        run = paragraph.add_run(f'\u2022  {line.strip().lstrip("•-* ").strip()}')
+        run.font.name = 'Calibri'
+        run.font.size = Pt(10)
+
+    set_reservation_table_widths(table, [RESERVATION_CONTENT_WIDTH.inches])
 
 
 def add_page_break(doc):
@@ -396,8 +541,17 @@ def generate_document(template_path: str, content: dict, output_path: str):
     fields = intake.get('fields') or {}
 
     if document_type == 'room_reservation':
+        for section in doc.sections:
+            section.page_width = Inches(8.5)
+            section.page_height = Inches(11)
+            section.left_margin = Inches(0.4)
+            section.right_margin = Inches(0.4)
+            section.top_margin = Inches(0.8)
+            section.bottom_margin = Inches(0.65)
+        set_reservation_header_branding(doc)
+        sections = []
         add_room_reservation_reference(doc, fields)
-    elif document_type and fields:
+    elif document_type and document_type != 'tour_itinerary' and fields:
         details = [
             [humanize_field_name(key), value]
             for key, value in fields.items()
