@@ -65,7 +65,7 @@ export function suggestItineraryImageMatches(
     const ranked = catalog
       .filter(image => !usedImageIds.has(image.id) && !usedImageIds.has(image.url))
       .map(image => ({ image, score: scoreItineraryImage(text.join(' '), image) }))
-      .filter(candidate => candidate.score >= 0.6)
+      .filter(candidate => candidate.score >= 0.5)
       .sort((left, right) => right.score - left.score || left.image.title.localeCompare(right.image.title))
 
     const best = ranked[0]?.image

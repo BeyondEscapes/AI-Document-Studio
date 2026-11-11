@@ -3,7 +3,8 @@ import fs from 'fs'
 import path from 'path'
 import { DATA_DIR } from '@/lib/storage'
 
-const IMAGE_DIRECTORY = path.join(DATA_DIR, 'itinerary-images')
+const USER_IMAGE_DIRECTORY = path.join(DATA_DIR, 'itinerary-images')
+const SHIPPED_IMAGE_DIRECTORY = path.join(process.cwd(), 'public', 'itinerary-images')
 
 export async function GET(
   _request: Request,
@@ -14,7 +15,9 @@ export async function GET(
     return NextResponse.json({ error: 'Image not found.' }, { status: 404 })
   }
 
-  const imagePath = path.join(IMAGE_DIRECTORY, `${id}.jpg`)
+  const userImagePath = path.join(USER_IMAGE_DIRECTORY, `${id}.jpg`)
+  const shippedImagePath = path.join(SHIPPED_IMAGE_DIRECTORY, `${id}.jpg`)
+  const imagePath = fs.existsSync(userImagePath) ? userImagePath : shippedImagePath
   if (!fs.existsSync(imagePath)) {
     return NextResponse.json({ error: 'Image not found.' }, { status: 404 })
   }

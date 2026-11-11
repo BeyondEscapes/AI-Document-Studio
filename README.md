@@ -25,7 +25,7 @@ A professional, local AI-powered document creation web application. Users chat w
    - Dual-mode: **Preview** (visual representation of final document) and **Edit** (modify structured fields, headings, paragraphs, bullet lists, and tables).
    - Review and approve documents, save changes locally, and export editable DOCX or PDF.
    - Template switcher (Beyond Escapes Official and custom uploaded templates).
-   - Itinerary destination photos can be matched from a local image library or added from the device; selected photos are embedded in DOCX/PDF exports.
+   - Itinerary destination photos are matched automatically from the bundled image library or added from the device; selected photos are embedded in DOCX/PDF exports.
 
 5. **Local Persistence & Privacy**
    - Fast SQLite database (`studio.db`) stores conversations, messages, document states, custom templates, and settings.
@@ -122,13 +122,13 @@ Alternatively, double-click **`start.bat`** in the project folder to start with 
 
 ### Optional: Import an Itinerary Photo Library
 
-Import only the JPEG photos from the supplied ZIP. The importer skips PSDs and documents, optimizes the photos, and stores them locally under the ignored `data/itinerary-images/` directory:
+To add or refresh the bundled destination library, import only the JPEG photos from the supplied ZIP. The importer skips PSDs and documents and optimizes the photos into `public/itinerary-images/` so they are available to every app instance:
 
 ```powershell
 npm run import:itinerary-images -- --zip "C:\path\to\Itinerary images.zip"
 ```
 
-In an itinerary, use **Auto-match locations** to attach confident destination matches. You can also choose a photo from the library or add a JPEG, PNG, or WebP image from your device in the section editor. Image data is included in each saved document and its exports; the photo library itself remains local.
+Itineraries automatically attach confident location matches when opened. You can also use **Auto-match locations**, choose another photo from the library, or add a JPEG, PNG, or WebP image from your device in the section editor. Selected image data is included in each saved document and its exports; device uploads remain local.
 
 ---
 

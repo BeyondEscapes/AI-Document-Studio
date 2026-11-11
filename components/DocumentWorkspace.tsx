@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import {
   FileText, Download, X, Edit3, Eye, FileDown,
@@ -51,8 +51,10 @@ export function DocumentWorkspace({
   const [imageSearch, setImageSearch] = useState('')
   const [imageStatus, setImageStatus] = useState<string | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
+  const [isLoadingImageCatalog, setIsLoadingImageCatalog] = useState(false)
   const [isMatchingImages, setIsMatchingImages] = useState(false)
   const [uploadingImageSectionId, setUploadingImageSectionId] = useState<string | null>(null)
+  const autoMatchedDocumentKey = useRef<string | null>(null)
   const [exportStatus, setExportStatus] = useState<{
     docx: 'idle' | 'loading' | 'success' | 'error'
     pdf: 'idle' | 'loading' | 'success' | 'error'
@@ -67,10 +69,12 @@ export function DocumentWorkspace({
       setImageCatalog([])
       setImageStatus(null)
       setImageError(null)
+      setIsLoadingImageCatalog(false)
       return
     }
 
     let active = true
+    setIsLoadingImageCatalog(true)
     fetch('/api/itinerary-images')
       .then(async response => {
         const result = await response.json()
@@ -79,6 +83,9 @@ export function DocumentWorkspace({
       })
       .catch(error => {
         if (active) setImageError(error instanceof Error ? error.message : 'Could not load the image library.')
+      })
+      .finally(() => {
+        if (active) setIsLoadingImageCatalog(false)
       })
 
     return () => { active = false }
@@ -301,7 +308,7 @@ export function DocumentWorkspace({
     }))
   }, [documentContent, onDocumentUpdate])
 
-  const handleAutoMatchImages = async () => {
+  const handleAutoMatchImages = useCallback(async () => {
     if (!documentContent) return
     setImageError(null)
     setImageStatus(null)
@@ -342,7 +349,22 @@ export function DocumentWorkspace({
     } finally {
       setIsMatchingImages(false)
     }
-  }
+  }, [documentContent, imageCatalog, onDocumentUpdate])
+
+  useEffect(() => {
+    const documentKey = documentContent
+      ? `${documentContent.metadata.generatedAt}:${documentContent.metadata.prompt}`
+      : null
+    if (
+      documentContent?.documentType !== 'tour_itinerary' ||
+      imageCatalog.length === 0 ||
+      !documentKey ||
+      autoMatchedDocumentKey.current === documentKey
+    ) return
+
+    autoMatchedDocumentKey.current = documentKey
+    void handleAutoMatchImages()
+  }, [documentContent?.documentType, documentContent?.metadata.generatedAt, documentContent?.metadata.prompt, imageCatalog, handleAutoMatchImages])
 
   const handleSaveLocally = async () => {
     setSaveError(null)
@@ -438,14 +460,16 @@ export function DocumentWorkspace({
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-2.5">
               <ImagePlus size={15} className="text-blue-600" />
               <span className="flex-1 text-xs text-blue-900">
-                {imageCatalog.length
+                {isLoadingImageCatalog
+                  ? 'Loading destination photos...'
+                  : imageCatalog.length
                   ? `${imageCatalog.length} destination photos available`
                   : 'Add destination photos to your itinerary'}
               </span>
               <button
                 type="button"
                 onClick={handleAutoMatchImages}
-                disabled={isMatchingImages || imageCatalog.length === 0}
+                disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
                 className="rounded-md bg-blue-600 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {isMatchingImages ? 'Matching...' : 'Auto-match locations'}

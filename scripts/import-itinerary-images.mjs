@@ -11,7 +11,7 @@ const root = process.cwd()
 const args = process.argv.slice(2)
 const zipIndex = args.indexOf('--zip')
 const zipPath = zipIndex >= 0 ? args[zipIndex + 1] : ''
-const dataDirectory = path.join(root, 'data', 'itinerary-images')
+const dataDirectory = path.join(root, 'public', 'itinerary-images')
 const pythonScript = path.join(root, 'python', 'extract_itinerary_images.py')
 
 if (!zipPath) {
@@ -68,7 +68,7 @@ try {
           title: title || sourceName,
           sourceName,
           sourcePath: entry.sourcePath,
-          url: `/api/itinerary-images/${id}`,
+          url: `/itinerary-images/${id}.jpg`,
           width: result.info.width,
           height: result.info.height,
         })

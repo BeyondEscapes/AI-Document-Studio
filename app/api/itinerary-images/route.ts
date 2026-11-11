@@ -10,13 +10,24 @@ export const runtime = 'nodejs'
 
 const IMAGE_DIRECTORY = path.join(DATA_DIR, 'itinerary-images')
 const CATALOG_PATH = path.join(IMAGE_DIRECTORY, 'catalog.json')
+const SHIPPED_IMAGE_DIRECTORY = path.join(process.cwd(), 'public', 'itinerary-images')
+const SHIPPED_CATALOG_PATH = path.join(SHIPPED_IMAGE_DIRECTORY, 'catalog.json')
 const MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 
-function readCatalog(): ItineraryImageCatalogItem[] {
-  if (!fs.existsSync(CATALOG_PATH)) return []
-  const catalog: unknown = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'))
+function readCatalogAt(catalogPath: string): ItineraryImageCatalogItem[] {
+  if (!fs.existsSync(catalogPath)) return []
+  const contents = fs.readFileSync(catalogPath, 'utf8').replace(/^\uFEFF/, '')
+  const catalog: unknown = JSON.parse(contents)
   if (!Array.isArray(catalog)) throw new Error('The itinerary image catalog has an invalid format.')
   return catalog as ItineraryImageCatalogItem[]
+}
+
+function readCatalog(): ItineraryImageCatalogItem[] {
+  const catalog = new Map(
+    readCatalogAt(SHIPPED_CATALOG_PATH).map(image => [image.id, image])
+  )
+  for (const image of readCatalogAt(CATALOG_PATH)) catalog.set(image.id, image)
+  return [...catalog.values()]
 }
 
 function writeCatalog(catalog: ItineraryImageCatalogItem[]): void {
@@ -61,7 +72,7 @@ export async function POST(request: NextRequest) {
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer({ resolveWithObject: true })
 
-    const catalog = readCatalog()
+    const catalog = readCatalogAt(CATALOG_PATH)
     const id = crypto.randomUUID()
     const safeName = path.basename(file.name).replace(/[\u0000-\u001f]/g, '').slice(0, 160) || 'Uploaded image'
     const item: ItineraryImageCatalogItem = {
