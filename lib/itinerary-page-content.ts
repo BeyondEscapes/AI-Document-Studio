@@ -87,7 +87,7 @@ export function getItineraryPageContent(content: DocumentContent): ItineraryPage
         ? `This itinerary presents a route through ${routeText}. The overview and daily schedule set out the destinations, travel transitions, and activities included in the trip details provided. Use the route map as a visual guide while referring to the day-by-day plan for specific arrangements.`
         : 'This itinerary presents the destinations, travel transitions, and activities included in the trip details provided. Use the route map as a visual guide while referring to the day-by-day plan for specific arrangements.')),
     welcome: settings.cover?.welcome
-      ?? (extracted.welcome || 'Warm wishes for a memorable journey through Sri Lanka.'),
+      ?? (extracted.welcome || "Begin in the spirit of Ayubowan, with wishes for a safe and memorable journey. Beyond Escapes is delighted to welcome you to Sri Lanka and share the island's warm hospitality, rich culture, lush landscapes and beautiful coastlines. We hope each stop becomes a lasting memory."),
     cancellationPolicy: settings.closing?.cancellationPolicy
       ?? (extracted.cancellationPolicy.length ? extracted.cancellationPolicy : DEFAULT_CANCELLATION_POLICY),
     preparedBy: settings.cover?.preparedBy

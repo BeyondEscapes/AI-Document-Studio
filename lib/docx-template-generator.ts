@@ -562,7 +562,7 @@ function createTableCell(
   const margins = wordElement(document, 'tcMar')
   for (const edge of ['top', 'left', 'bottom', 'right']) {
     const margin = wordElement(document, edge)
-    setWordAttribute(margin, 'w', 90)
+    setWordAttribute(margin, 'w', 120)
     setWordAttribute(margin, 'type', 'dxa')
     margins.appendChild(margin)
   }
@@ -603,7 +603,7 @@ function createItineraryCoverTable(
   properties.appendChild(borders)
   table.appendChild(properties)
 
-  const leftWidth = 3900
+  const leftWidth = 5040
   const rightWidth = CONTENT_WIDTH - leftWidth
   const grid = wordElement(document, 'tblGrid')
   for (const columnWidth of [leftWidth, rightWidth]) {
@@ -613,9 +613,18 @@ function createItineraryCoverTable(
   }
   table.appendChild(grid)
 
+  const routeStopsText = (cover.routeStops ?? [])
+    .map(stop => stop.name.trim())
+    .filter(Boolean)
+    .map((name, index) => `${index + 1}. ${name}`)
+    .join('  >  ')
   const mapCellElements = [
     createParagraph(document, 'SRI LANKA ROUTE MAP', { bold: true, color: BLUE, alignment: 'center', after: 80, size: 20 }),
     ...mapImageElements,
+    ...(routeStopsText ? [
+      createParagraph(document, 'ROUTE STOPS', { bold: true, color: BLUE, alignment: 'center', before: 50, after: 20, size: 16 }),
+      createParagraph(document, routeStopsText, { alignment: 'center', size: 15, after: 25 }),
+    ] : []),
     createParagraph(document, cover.mapAttribution ?? 'Road map screenshot not saved', {
       color: '66737E',
       alignment: 'center',
@@ -626,40 +635,55 @@ function createItineraryCoverTable(
   ]
 
   const rightCellElements: XmlElement[] = [
-    createParagraph(document, 'YOUR JOURNEY AT A GLANCE', { bold: true, color: BLUE, size: 21, after: 70 }),
-    createParagraph(document, cover.overview ?? '', { size: 18, after: 110 }),
-    createParagraph(document, 'A WARM WELCOME', { bold: true, color: '668678', size: 19, after: 50 }),
-    createParagraph(document, cover.welcome ?? '', { size: 17, after: 100 }),
+    createParagraph(document, 'YOUR JOURNEY AT A GLANCE', { bold: true, color: BLUE, size: 23, after: 90 }),
+    createParagraph(document, cover.overview ?? '', { size: 20, after: 150 }),
+    createParagraph(document, 'A WARM WELCOME', { bold: true, color: '668678', size: 21, after: 60 }),
+    createParagraph(document, cover.welcome ?? '', { size: 19, after: 130 }),
   ]
-  const routeText = intakeFields.destinations?.trim()
-    || intakeFields.route?.trim()
-    || intakeFields.travelRoute?.trim()
-    || (cover.routeStops ?? []).map(stop => stop.name).join(' - ')
-  if (routeText) {
-    rightCellElements.push(
-      createParagraph(document, 'ROUTE PLAN', { bold: true, color: BLUE, size: 19, after: 40 }),
-      createParagraph(document, routeText, { bold: true, size: 17, after: 70 })
-    )
-  }
   const tripDetails = [
     intakeFields.tripDuration?.trim() ? `Trip duration: ${intakeFields.tripDuration.trim()}` : '',
     intakeFields.travelDates?.trim() ? `Travel dates: ${intakeFields.travelDates.trim()}` : '',
     cover.preparedBy?.trim() ? `Prepared by: ${cover.preparedBy.trim()}` : '',
   ].filter(Boolean)
-  if (tripDetails.length) rightCellElements.push(createParagraph(document, tripDetails.join('\n'), { size: 16, after: 65 }))
-  const contacts = [
-    intakeFields.phone?.trim() ?? '+94 112 579 679',
-    intakeFields.email?.trim() ?? 'tours@beyondescapes.com',
-  ].filter(Boolean)
-  if (contacts.length) {
-    rightCellElements.push(createParagraph(document, contacts.join('\n'), { color: '35485B', size: 16, after: 30 }))
+  if (tripDetails.length) {
+    rightCellElements.push(
+      createParagraph(document, 'TRIP DETAILS', { bold: true, color: BLUE, before: 40, after: 40, size: 19 }),
+      createParagraph(document, tripDetails.join('\n'), { size: 18, after: 40 })
+    )
   }
 
   const row = wordElement(document, 'tr')
   row.appendChild(createTableCell(document, leftWidth, mapCellElements, 'F4F8F5'))
-  row.appendChild(createTableCell(document, rightWidth, rightCellElements))
+  row.appendChild(createTableCell(document, rightWidth, rightCellElements, 'F8FAFC'))
   table.appendChild(row)
   return table
+}
+
+function itineraryCoverContactElements(
+  document: XmlDocument,
+  companyName: string,
+  fields: Record<string, string>
+): XmlElement[] {
+  const contactLine = [fields.phone?.trim(), fields.email?.trim()].filter(Boolean).join('  |  ')
+  const elements = [createHeadingBar(document, companyName)]
+  if (contactLine) {
+    elements.push(createParagraph(document, contactLine, {
+      alignment: 'center',
+      color: '35485B',
+      before: 40,
+      after: 20,
+      size: 17,
+    }))
+  }
+  if (fields.address?.trim()) {
+    elements.push(createParagraph(document, fields.address.trim(), {
+      alignment: 'center',
+      color: '35485B',
+      after: 20,
+      size: 17,
+    }))
+  }
+  return elements
 }
 
 function itineraryClosingElements(document: XmlDocument, closing: ItineraryClosingSettings): XmlElement[] {
@@ -920,27 +944,37 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
         bold: true,
         color: BLUE,
         alignment: 'center',
-        before: 80,
-        after: 70,
-        size: 34,
+        before: 40,
+        after: 80,
+        size: 44,
       }),
       ...imageElements,
     )
     const mapElements: XmlElement[] = []
     if (itineraryCover.mapImage) {
-      await addItineraryImages(archive, document, [itineraryCover.mapImage], mapElements)
+      await addItineraryImages(archive, document, [{
+        ...itineraryCover.mapImage,
+        displayWidth: 3.25,
+        displayHeight: 4.4,
+      }], mapElements)
     }
     const closingSettings = content.itineraryPages?.closing ?? {}
     const coverFields = {
       ...content.intake?.fields,
       phone: closingSettings.phone ?? content.intake?.fields.phone ?? '',
       email: closingSettings.email ?? content.intake?.fields.email ?? '',
+      address: closingSettings.address ?? content.intake?.fields.address ?? '',
     }
     elements.push(createItineraryCoverTable(
       document,
       itineraryCover,
       coverFields,
       mapElements
+    ))
+    elements.push(...itineraryCoverContactElements(
+      document,
+      closingSettings.companyName?.trim() || 'BEYOND ESCAPES PRIVATE LIMITED',
+      coverFields
     ))
   } else if (content.coverImage && content.documentType !== 'tour_itinerary') {
     await addItineraryImages(archive, document, [content.coverImage], elements)

@@ -295,12 +295,12 @@ def set_table_borders_hidden(table):
 def add_itinerary_cover(doc, content, cover):
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.paragraph_format.space_before = Pt(4)
-    title.paragraph_format.space_after = Pt(5)
+    title.paragraph_format.space_before = Pt(2)
+    title.paragraph_format.space_after = Pt(4)
     title_run = title.add_run(content.get('title') or 'TOUR OF SRI LANKA')
     title_run.font.name = 'Times New Roman'
     title_run.font.bold = True
-    title_run.font.size = Pt(18)
+    title_run.font.size = Pt(22)
     title_run.font.color.rgb = RGBColor(0x39, 0x73, 0xB9)
 
     artwork = cover.get('welcomeArtwork')
@@ -310,17 +310,18 @@ def add_itinerary_cover(doc, content, cover):
     table = doc.add_table(rows=1, cols=2)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
-    table.columns[0].width = Inches(2.55)
-    table.columns[1].width = Inches(4.22)
+    table.columns[0].width = Inches(3.5)
+    table.columns[1].width = Inches(3.5)
     set_table_borders_hidden(table)
     map_cell, details_cell = table.rows[0].cells
-    map_cell.width = Inches(2.55)
-    details_cell.width = Inches(4.22)
+    map_cell.width = Inches(3.5)
+    details_cell.width = Inches(3.5)
     map_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
     details_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
-    set_cell_margins(map_cell)
-    set_cell_margins(details_cell)
+    set_cell_margins(map_cell, top=120, start=120, bottom=120, end=120)
+    set_cell_margins(details_cell, top=120, start=120, bottom=120, end=120)
     set_cell_fill(map_cell, 'F4F8F5')
+    set_cell_fill(details_cell, 'F8FAFC')
 
     heading = map_cell.paragraphs[0]
     heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -336,7 +337,16 @@ def add_itinerary_cover(doc, content, cover):
         map_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         map_paragraph.paragraph_format.space_before = Pt(0)
         map_paragraph.paragraph_format.space_after = Pt(2)
-        add_image_to_paragraph(map_paragraph, map_image, max_width=2.4, max_height=4.5)
+        add_image_to_paragraph(map_paragraph, map_image, max_width=3.25, max_height=4.4)
+    route_stops = [
+        stop.get('name', '').strip()
+        for stop in cover.get('routeStops', [])
+        if isinstance(stop, dict) and stop.get('name', '').strip()
+    ]
+    if route_stops:
+        add_cover_cell_paragraph(map_cell, 'ROUTE STOPS', size=8, color=(0x39, 0x73, 0xB9), bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER, before=3, after=1)
+        stop_text = '  >  '.join(f'{index + 1}. {name}' for index, name in enumerate(route_stops))
+        add_cover_cell_paragraph(map_cell, stop_text, size=7.5, alignment=WD_ALIGN_PARAGRAPH.CENTER, after=3)
     attribution = cover.get('mapAttribution') or 'Road map screenshot not saved'
     add_cover_cell_paragraph(map_cell, attribution, size=6, color=(102, 115, 126), alignment=WD_ALIGN_PARAGRAPH.CENTER, after=0)
 
@@ -347,17 +357,10 @@ def add_itinerary_cover(doc, content, cover):
         fields['phone'] = closing.get('phone')
     if 'email' in closing:
         fields['email'] = closing.get('email')
-    add_cover_cell_paragraph(details_cell, 'YOUR JOURNEY AT A GLANCE', size=10, color=(0x39, 0x73, 0xB9), bold=True, after=3)
-    add_cover_cell_paragraph(details_cell, cover.get('overview', ''), size=9, after=5)
-    add_cover_cell_paragraph(details_cell, 'A WARM WELCOME', size=9.5, color=(0x66, 0x86, 0x78), bold=True, after=2)
-    add_cover_cell_paragraph(details_cell, cover.get('welcome', ''), size=8.5, after=5)
-
-    route_text = fields.get('destinations', '').strip() or fields.get('route', '').strip() or fields.get('travelRoute', '').strip()
-    if not route_text:
-        route_text = ' - '.join(stop.get('name', '') for stop in cover.get('routeStops', []) if stop.get('name'))
-    if route_text:
-        add_cover_cell_paragraph(details_cell, 'ROUTE PLAN', size=9, color=(0x39, 0x73, 0xB9), bold=True, after=2)
-        add_cover_cell_paragraph(details_cell, route_text, size=8.5, bold=True, after=4)
+    add_cover_cell_paragraph(details_cell, 'YOUR JOURNEY AT A GLANCE', size=11, color=(0x39, 0x73, 0xB9), bold=True, after=5)
+    add_cover_cell_paragraph(details_cell, cover.get('overview', ''), size=10, after=8)
+    add_cover_cell_paragraph(details_cell, 'A WARM WELCOME', size=10.5, color=(0x66, 0x86, 0x78), bold=True, after=4)
+    add_cover_cell_paragraph(details_cell, cover.get('welcome', ''), size=9.5, after=8)
 
     trip_details = [
         f"Trip duration: {fields.get('tripDuration', '').strip()}" if fields.get('tripDuration', '').strip() else '',
@@ -366,13 +369,37 @@ def add_itinerary_cover(doc, content, cover):
     ]
     trip_details = [line for line in trip_details if line]
     if trip_details:
-        add_cover_cell_paragraph(details_cell, '\n'.join(trip_details), size=8, after=4)
+        add_cover_cell_paragraph(details_cell, 'TRIP DETAILS', size=9.5, color=(0x39, 0x73, 0xB9), bold=True, before=2, after=2)
+        add_cover_cell_paragraph(details_cell, '\n'.join(trip_details), size=9, after=2)
+
     contacts = [
         fields.get('phone', '+94 112 579 679'),
         fields.get('email', 'tours@beyondescapes.com'),
     ]
     contacts = [line.strip() for line in contacts if isinstance(line, str) and line.strip()]
-    add_cover_cell_paragraph(details_cell, '\n'.join(contacts), size=8, color=(53, 72, 91), after=0)
+    address = closing.get('address') or fields.get('address', '')
+    company_name = closing.get('companyName') or 'BEYOND ESCAPES PRIVATE LIMITED'
+    if contacts or address:
+        add_blue_heading_bar(doc, company_name)
+        contact_paragraph = doc.add_paragraph()
+        contact_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        contact_paragraph.paragraph_format.space_before = Pt(3)
+        contact_paragraph.paragraph_format.space_after = Pt(1)
+        contact_paragraph.paragraph_format.line_spacing = Pt(10)
+        contact_run = contact_paragraph.add_run('  |  '.join(contacts))
+        contact_run.font.name = 'Times New Roman'
+        contact_run.font.size = Pt(8.5)
+        contact_run.font.color.rgb = RGBColor(53, 72, 91)
+        if address:
+            address_paragraph = doc.add_paragraph()
+            address_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            address_paragraph.paragraph_format.space_before = Pt(0)
+            address_paragraph.paragraph_format.space_after = Pt(2)
+            address_paragraph.paragraph_format.line_spacing = Pt(10)
+            address_run = address_paragraph.add_run(address)
+            address_run.font.name = 'Times New Roman'
+            address_run.font.size = Pt(8.5)
+            address_run.font.color.rgb = RGBColor(53, 72, 91)
 
 
 def add_itinerary_closing(doc, closing):

@@ -784,10 +784,10 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
   const sections = extractItinerarySections(documentContent.sections).remaining
   const fields = documentContent.intake?.fields ?? {}
   const cover = documentContent.itineraryPages?.cover ?? {}
-  const closing = documentContent.itineraryPages?.closing ?? {}
   const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim()
   const routeStops = cover.routeStops ?? getInitialRouteStops(routeText)
-  const routePlan = routeText || routeStops.map(stop => stop.name).join(' - ')
+  const routePlan = routeStops.map((stop, index) => `${index + 1}. ${stop.name}`).join('  >  ')
+    || routeText
   const itinerarySections = sections.at(-1)?.type === 'page_break' ? sections.slice(0, -1) : sections
 
   return (
@@ -806,7 +806,7 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
             <p className="text-[8px] text-gray-500">Beyond Escapes | Sri Lanka</p>
           </div>
         </div>
-        <h1 className="mb-2 text-center font-serif text-xl font-bold text-[#3973B9]">{documentContent.title}</h1>
+        <h1 className="mb-2 text-center font-serif text-2xl font-bold text-[#3973B9]">{documentContent.title}</h1>
         <Image
           src="/images/sri-lanka-ayubowan.png"
           alt="Ayubowan welcome banner with a Sri Lankan woman greeting in English and Sinhala"
@@ -814,39 +814,44 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
           height={726}
           className="mb-1 h-auto w-full rounded-md object-contain"
         />
-        <div className="grid grid-cols-[0.8fr_1.2fr] gap-3">
-          <div className="rounded-md bg-[#F4F8F5] p-2">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-md bg-[#F4F8F5] p-3">
             <p className="mb-1 text-center font-sans text-[9px] font-bold text-[#3973B9]">SRI LANKA ROUTE MAP</p>
             <CoverMapPreview image={cover.mapImage} />
+            <div className="mt-2 border-t border-[#d9e7dc] pt-2">
+              <p className="mb-1 text-center font-sans text-[9px] font-bold text-[#3973B9]">ROUTE STOPS</p>
+              <p className="text-center font-sans text-[9px] leading-relaxed text-gray-700">{routePlan}</p>
+            </div>
             <p className="mt-1 text-center font-sans text-[7px] text-gray-500">
               {cover.mapAttribution || 'Road map screenshot not saved'}
             </p>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3 rounded-md bg-[#F8FAFC] p-3">
             <div>
-              <h2 className="text-[11px] font-bold text-[#3973B9]">YOUR JOURNEY AT A GLANCE</h2>
-              <p className="text-[9px] leading-relaxed text-gray-700">{pageContent.overview}</p>
+              <h2 className="text-xs font-bold text-[#3973B9]">YOUR JOURNEY AT A GLANCE</h2>
+              <p className="text-[10px] leading-relaxed text-gray-700">{pageContent.overview}</p>
             </div>
             <div>
-              <h2 className="text-[10px] font-bold text-[#668678]">A WARM WELCOME</h2>
-              <p className="text-[9px] leading-relaxed text-gray-700">{pageContent.welcome}</p>
+              <h2 className="text-[11px] font-bold text-[#668678]">A WARM WELCOME</h2>
+              <p className="text-[10px] leading-relaxed text-gray-700">{pageContent.welcome}</p>
             </div>
-            {routePlan && (
-              <div>
-                <h2 className="text-[10px] font-bold text-[#3973B9]">ROUTE PLAN</h2>
-                <p className="text-[9px] font-semibold text-gray-700">{routePlan}</p>
-              </div>
-            )}
-            <div className="text-[8px] leading-relaxed text-gray-600">
+            <div className="border-t border-gray-200 pt-2 text-[9px] leading-relaxed text-gray-600">
+              <h2 className="mb-1 font-sans text-[10px] font-bold text-[#3973B9]">TRIP DETAILS</h2>
               {fields.tripDuration && <p>Trip duration: {fields.tripDuration}</p>}
               {fields.travelDates && <p>Travel dates: {fields.travelDates}</p>}
               <p>Prepared by: {pageContent.preparedBy}</p>
-              <p>{closing.phone ?? '+94 112 579 679'}</p>
-              <p>{closing.email ?? 'tours@beyondescapes.com'}</p>
             </div>
           </div>
         </div>
-        <p className="mt-3 border-t border-gray-100 pt-2 text-center font-sans text-[8px] text-gray-400">Page 1 | Editable cover page</p>
+        <div className="mt-3 overflow-hidden rounded-md border border-blue-100">
+          <p className="bg-[#3973B9] px-3 py-1.5 text-center font-sans text-[10px] font-bold text-white">{pageContent.companyName}</p>
+          <div className="space-y-1 bg-[#F8FAFC] px-3 py-2 text-center font-sans text-[9px] text-gray-600">
+            <p>{pageContent.phone}</p>
+            <p>{pageContent.email}</p>
+            <p>{pageContent.address}</p>
+          </div>
+        </div>
+        <p className="mt-2 border-t border-gray-100 pt-2 text-center font-sans text-[8px] text-gray-400">Page 1 | Editable cover page</p>
       </article>
 
       <article className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -898,13 +903,13 @@ function CoverMapPreview({
         width={image.width}
         height={image.height}
         unoptimized
-        className="max-h-64 w-full rounded object-contain"
+        className="max-h-[28rem] w-full rounded object-contain"
       />
     )
   }
 
   return (
-    <div role="status" className="mx-auto flex min-h-40 max-h-64 w-full items-center justify-center rounded bg-blue-50 px-3 text-center text-xs text-blue-800">
+    <div role="status" className="mx-auto flex min-h-40 max-h-[28rem] w-full items-center justify-center rounded bg-blue-50 px-3 text-center text-xs text-blue-800">
       A real road map will appear here after the map editor generates or uploads one.
     </div>
   )
