@@ -808,13 +808,12 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
         </div>
         <h1 className="mb-2 text-center font-serif text-xl font-bold text-[#3973B9]">{documentContent.title}</h1>
         <Image
-          src="/images/sri-lanka-ayubowan.svg"
-          alt="Illustration of a warm Sri Lankan welcome"
-          width={1500}
-          height={410}
-          className="mb-1 h-auto max-h-40 w-full rounded-md object-cover"
+          src="/images/sri-lanka-ayubowan.png"
+          alt="Ayubowan welcome banner with a Sri Lankan woman greeting in English and Sinhala"
+          width={2167}
+          height={726}
+          className="mb-1 h-auto w-full rounded-md object-contain"
         />
-        <p className="mb-3 text-center font-serif text-sm font-bold text-[#668678]">Ayubowan | Welcome to Sri Lanka</p>
         <div className="grid grid-cols-[0.8fr_1.2fr] gap-3">
           <div className="rounded-md bg-[#F4F8F5] p-2">
             <p className="mb-1 text-center font-sans text-[9px] font-bold text-[#3973B9]">SRI LANKA ROUTE MAP</p>

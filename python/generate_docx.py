@@ -306,15 +306,6 @@ def add_itinerary_cover(doc, content, cover):
     artwork = cover.get('welcomeArtwork')
     if artwork:
         add_document_images(doc, [artwork])
-    welcome_heading = doc.add_paragraph()
-    welcome_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    welcome_heading.paragraph_format.space_before = Pt(0)
-    welcome_heading.paragraph_format.space_after = Pt(5)
-    welcome_run = welcome_heading.add_run('Ayubowan | Welcome to Sri Lanka')
-    welcome_run.font.name = 'Times New Roman'
-    welcome_run.font.bold = True
-    welcome_run.font.size = Pt(12)
-    welcome_run.font.color.rgb = RGBColor(0x66, 0x86, 0x78)
 
     table = doc.add_table(rows=1, cols=2)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER

@@ -925,14 +925,6 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
         size: 34,
       }),
       ...imageElements,
-      createParagraph(document, 'Ayubowan | Welcome to Sri Lanka', {
-        bold: true,
-        color: '668678',
-        alignment: 'center',
-        before: 30,
-        after: 70,
-        size: 22,
-      })
     )
     const mapElements: XmlElement[] = []
     if (itineraryCover.mapImage) {
