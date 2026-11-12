@@ -287,45 +287,7 @@ export default function ItineraryMapEditor({
     setRouteMessage('Stop removed. Generate the road route again to update the map.')
   }
 
-  const generateRoadRoute = async () => {
-    const locatedStops = routeStops.filter(stop => stop.latitude !== null && stop.longitude !== null)
-    if (locatedStops.length < 2 || locatedStops.length !== routeStops.length) {
-      setRouteError('Set a map location for every stop and place at least two stops before generating a road route.')
-      return
-    }
-    setIsRouting(true)
-    setRouteError(null)
-    try {
-      const coordinates = locatedStops.map(stop => `${stop.longitude},${stop.latitude}`).join(';')
-      const response = await fetch(
-        `${ROUTING_BASE_URL}/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`,
-        { signal: AbortSignal.timeout(25_000) }
-      )
-      if (!response.ok) throw new Error(`Routing service returned HTTP ${response.status}.`)
-      const data = await response.json() as OsrmResponse
-      if (data.code !== 'Ok' || !data.routes?.[0]?.geometry?.coordinates?.length) {
-        throw new Error(data.message || 'The routing service could not find a road route for these stops.')
-      }
-      routeGeometryRef.current = data.routes[0].geometry
-      if (routeSourceRef.current) {
-        routeSourceRef.current.setData(routeFeatures(routeGeometryRef.current, routeStops))
-      }
-      onRouteStopsChangeRef.current([...routeStops])
-      setRouteMessage('Road-following route ready. Apply the map to the cover to save this image.')
-    } catch (error) {
-      routeGeometryRef.current = null
-      const message = error instanceof Error ? error.message : 'Could not generate the road route.'
-      setRouteError(`${message} You can still place stops manually or upload a map image.`)
-      setRouteMessage('The displayed line joins stops directly and is not a road route.')
-      if (routeSourceRef.current) {
-        routeSourceRef.current.setData(routeFeatures(null, routeStops))
-      }
-    } finally {
-      setIsRouting(false)
-    }
-  }
-
-  const applyMap = async () => {
+  const captureMap = async (stops: ItineraryRouteStop[]) => {
     const map = mapRef.current
     if (!mapReady || !map) return
     try {
@@ -341,16 +303,60 @@ export default function ItineraryMapEditor({
       }
       onMapImageChange({
         src,
-        altText: 'MapLibre map with the itinerary route and numbered stops',
+        altText: 'Screenshot of the road map with the itinerary route and numbered stops',
         width: canvas.width,
         height: canvas.height,
         displayWidth: 2.4,
         displayHeight: 4.8,
-      }, OPENFREEMAP_ATTRIBUTION, JSON.stringify(routeStops))
-      setRouteMessage('Map image saved to the cover.')
+      }, OPENFREEMAP_ATTRIBUTION, JSON.stringify(stops))
+      setRouteMessage('Map screenshot added to the cover.')
     } catch (error) {
       setRouteError(error instanceof Error ? `Could not capture the map image: ${error.message}` : 'Could not capture the map image.')
     }
+  }
+
+  const generateRoadRoute = async () => {
+    const locatedStops = routeStops.filter(stop => stop.latitude !== null && stop.longitude !== null)
+    if (locatedStops.length < 2 || locatedStops.length !== routeStops.length) {
+      setRouteError('Set a map location for every stop and place at least two stops before generating a road route.')
+      return
+    }
+    setIsRouting(true)
+    setRouteError(null)
+    let routeReady = false
+    try {
+      const coordinates = locatedStops.map(stop => `${stop.longitude},${stop.latitude}`).join(';')
+      const response = await fetch(
+        `${ROUTING_BASE_URL}/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`,
+        { signal: AbortSignal.timeout(25_000) }
+      )
+      if (!response.ok) throw new Error(`Routing service returned HTTP ${response.status}.`)
+      const data = await response.json() as OsrmResponse
+      if (data.code !== 'Ok' || !data.routes?.[0]?.geometry?.coordinates?.length) {
+        throw new Error(data.message || 'The routing service could not find a road route for these stops.')
+      }
+      routeGeometryRef.current = data.routes[0].geometry
+      if (routeSourceRef.current) {
+        routeSourceRef.current.setData(routeFeatures(routeGeometryRef.current, routeStops))
+      }
+      routeReady = true
+      setRouteMessage('Road-following route ready. Adding the map screenshot to the cover...')
+    } catch (error) {
+      routeGeometryRef.current = null
+      const message = error instanceof Error ? error.message : 'Could not generate the road route.'
+      setRouteError(`${message} You can still place stops manually or upload a map image.`)
+      setRouteMessage('The displayed line joins stops directly and is not a road route.')
+      if (routeSourceRef.current) {
+        routeSourceRef.current.setData(routeFeatures(null, routeStops))
+      }
+    } finally {
+      setIsRouting(false)
+    }
+    if (routeReady) await captureMap(routeStops)
+  }
+
+  const applyMap = async () => {
+    await captureMap(routeStops)
   }
 
   const handleUpload = async (file?: File) => {
