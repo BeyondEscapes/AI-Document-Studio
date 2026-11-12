@@ -16,6 +16,8 @@ export interface DocumentImage {
   caption?: string
   width: number
   height: number
+  displayWidth?: number
+  displayHeight?: number
 }
 
 export interface ItineraryImageCatalogItem {

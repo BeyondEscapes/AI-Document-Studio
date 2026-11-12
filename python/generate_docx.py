@@ -204,7 +204,11 @@ def add_document_images(doc, images):
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraph.paragraph_format.space_before = Pt(4)
         paragraph.paragraph_format.space_after = Pt(4)
-        picture = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(5.8))
+        aspect_ratio = max(0.01, float(image.get('width', 1)) / max(1, float(image.get('height', 1))))
+        max_width = max(1, float(image.get('displayWidth') or 5.8))
+        max_height = max(1, float(image.get('displayHeight') or 4.2))
+        width = min(max_width, max_height * aspect_ratio)
+        picture = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(width))
         picture._inline.docPr.set('descr', str(image.get('altText') or image.get('caption') or 'Itinerary photo')[:500])
         picture._inline.docPr.set('title', str(image.get('caption') or image.get('altText') or 'Itinerary photo')[:255])
         caption = image.get('caption')
@@ -218,15 +222,20 @@ def add_document_images(doc, images):
             run.font.italic = True
 
 
-def add_title_paragraph(doc, text: str):
+def add_title_paragraph(doc, text: str, branded=False):
     """Add document title."""
     para = doc.add_paragraph()
-    para.paragraph_format.space_after = Pt(8)
+    para.paragraph_format.space_before = Pt(8 if branded else 0)
+    para.paragraph_format.space_after = Pt(12 if branded else 8)
+    if branded:
+        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
     run = para.add_run(text)
     run.font.name = 'Times New Roman'
     run.font.bold = True
-    run.font.size = Pt(12)
+    run.font.size = Pt(18 if branded else 12)
+    if branded:
+        run.font.color.rgb = RGBColor(0x39, 0x73, 0xB9)
     
     return para
 
@@ -619,7 +628,7 @@ def generate_document(template_path: str, content: dict, output_path: str):
         rows = section.get('rows', [])
         
         if section_type == 'title':
-            add_title_paragraph(doc, section_content)
+            add_title_paragraph(doc, section_content, branded=document_type == 'tour_itinerary')
         
         elif section_type == 'heading1':
             # Blue heading bar
@@ -668,6 +677,20 @@ def generate_document(template_path: str, content: dict, output_path: str):
         run.font.name = 'Times New Roman'
         run.font.bold = True
         run.font.size = Pt(12)
+    if document_type == 'tour_itinerary':
+        add_blue_heading_bar(doc, 'BEYOND ESCAPES PRIVATE LIMITED')
+        for line in [
+            '+94 112 579 679 | +94 112 579 779 | +94 76 900 2880',
+            'tours@beyondescapes.com | www.beyondescapes.com',
+            '164/B, New Kandy Rd, Kothalawala, Kaduwela, Sri Lanka',
+        ]:
+            paragraph = doc.add_paragraph()
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraph.paragraph_format.space_before = Pt(4)
+            paragraph.paragraph_format.space_after = Pt(4)
+            run = paragraph.add_run(line)
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(10)
     
     # Save document
     doc.save(output_path)

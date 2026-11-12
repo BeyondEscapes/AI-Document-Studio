@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocx, generatePdf, generateFilename, getExportedFile } from '@/lib/export'
 import { generateBrandedDocx } from '@/lib/docx-template-generator'
+import { addItineraryOpeningPages } from '@/lib/itinerary-opening-pages'
 import { getTheme, getSettings } from '@/lib/db'
 import path from 'path'
 import type { DocumentContent } from '@/types'
@@ -18,20 +19,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Format must be "docx" or "pdf"' }, { status: 400 })
     }
 
+    const content = await addItineraryOpeningPages(documentContent as DocumentContent)
     // Get theme/template
     const settings = getSettings()
     const effectiveThemeId = themeId || settings.defaultThemeId
     const theme = getTheme(effectiveThemeId)
     
     let templatePath: string
-    if (theme && require('fs').existsSync(theme.templatePath)) {
+    if (content.documentType === 'tour_itinerary') {
+      templatePath = path.join(process.cwd(), 'assets', 'beyond-escapes-template.docx')
+    } else if (theme && require('fs').existsSync(theme.templatePath)) {
       templatePath = theme.templatePath
     } else {
       // Fall back to default template
       templatePath = path.join(process.cwd(), 'assets', 'beyond-escapes-template.docx')
     }
 
-    const content = documentContent as DocumentContent
     if (process.env.VERCEL) {
       const docxFilename = filename
         ? filename.replace(/\.(docx|pdf)$/, '') + '.docx'

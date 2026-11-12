@@ -442,15 +442,21 @@ export function DocumentWorkspace({
       <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
         <Palette size={12} className="text-gray-400 flex-shrink-0" />
         <span className="text-xs text-gray-500">Template:</span>
-        <select
-          value={selectedThemeId}
-          onChange={e => onThemeChange(e.target.value)}
-          className="text-xs border-0 bg-transparent text-gray-700 font-medium focus:outline-none cursor-pointer flex-1 max-w-xs"
-        >
-          {themes.map(theme => (
-            <option key={theme.id} value={theme.id}>{theme.name}</option>
-          ))}
-        </select>
+        {documentContent.documentType === 'tour_itinerary' ? (
+          <span className="text-xs font-medium text-gray-700">
+            Beyond Escapes Official <span className="font-normal text-gray-400">(fixed for itinerary branding)</span>
+          </span>
+        ) : (
+          <select
+            value={selectedThemeId}
+            onChange={e => onThemeChange(e.target.value)}
+            className="text-xs border-0 bg-transparent text-gray-700 font-medium focus:outline-none cursor-pointer flex-1 max-w-xs"
+          >
+            {themes.map(theme => (
+              <option key={theme.id} value={theme.id}>{theme.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Document Content */}

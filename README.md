@@ -201,6 +201,10 @@ To add a document type, add its field schema and required-field rules to `BUSINE
    - **Tables**: Styled with blue header bars and borders.
    - **Closing**: Centered `****END OF SERVICES****`.
 
+### Finalized itinerary layout reference
+
+The supplied finalized itinerary was measured at approximately **1,356 words**, **8 A4 pages**, and **11 inline images**. Its opening page uses a route map of about **7.14 × 2.23 inches** and a feature image of about **3.73 × 4.72 inches**; destination photos are predominantly wide banners around **7.26 × 2.66 inches**. New itinerary exports target a similar concise, day-by-day style (about **1,200–1,450 words** for a typical week-long trip), add a generated Sri Lanka route-map graphic and an **Ayubowan | Welcome to Sri Lanka** page, and finish with the Beyond Escapes company contact block. Itineraries always use the official Beyond Escapes template; other document types continue to use the selected template. The official template header logos, blue `#3973B9` heading bars, and branded footer remain in place.
+
 ---
 
 ## 🔧 Troubleshooting

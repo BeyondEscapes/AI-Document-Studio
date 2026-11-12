@@ -513,10 +513,12 @@ function documentIntakeElements(document: XmlDocument, content: DocumentContent)
   ]
 }
 
-function sectionElements(document: XmlDocument, section: DocumentSection): XmlElement[] {
+function sectionElements(document: XmlDocument, section: DocumentSection, brandedTitle = false): XmlElement[] {
   switch (section.type) {
     case 'title':
-      return [createParagraph(document, section.content, { bold: true, after: 160 })]
+      return [createParagraph(document, section.content, brandedTitle
+        ? { bold: true, color: BLUE, alignment: 'center', before: 160, after: 240, size: 36 }
+        : { bold: true, after: 160 })]
     case 'heading1':
       return [createHeadingBar(document, section.content)]
     case 'heading2':
@@ -565,7 +567,9 @@ function createImageParagraph(
 ): XmlElement {
   const naturalWidth = Math.max(1, Number(image.width) || 4)
   const naturalHeight = Math.max(1, Number(image.height) || 3)
-  const scale = Math.min(5.8 * 914400 / naturalWidth, 4.2 * 914400 / naturalHeight)
+  const maxWidth = Math.max(1, Number(image.displayWidth) || 5.8)
+  const maxHeight = Math.max(1, Number(image.displayHeight) || 4.2)
+  const scale = Math.min(maxWidth * 914400 / naturalWidth, maxHeight * 914400 / naturalHeight)
   const width = Math.round(naturalWidth * scale)
   const height = Math.round(naturalHeight * scale)
 
@@ -767,11 +771,26 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
   elements.push(...documentIntakeElements(document, content))
   for (const section of content.sections) {
     if (content.documentType === 'room_reservation') continue
-    elements.push(...sectionElements(document, section))
+    elements.push(...sectionElements(document, section, content.documentType === 'tour_itinerary'))
     await addItineraryImages(archive, document, section.images ?? [], elements)
   }
   if (!content.documentType || content.documentType === 'tour_itinerary' || content.documentType === 'tour_proposal') {
     elements.push(createParagraph(document, '****END OF SERVICES****', { bold: true, before: 240, alignment: 'center' }))
+  }
+  if (content.documentType === 'tour_itinerary') {
+    elements.push(createHeadingBar(document, 'BEYOND ESCAPES PRIVATE LIMITED'))
+    for (const line of [
+      '+94 112 579 679 | +94 112 579 779 | +94 76 900 2880',
+      'tours@beyondescapes.com | www.beyondescapes.com',
+      '164/B, New Kandy Rd, Kothalawala, Kaduwela, Sri Lanka',
+    ]) {
+      elements.push(createParagraph(document, line, {
+        alignment: 'center',
+        before: 80,
+        after: 80,
+        size: 20,
+      }))
+    }
   }
 
   for (const element of elements) {
