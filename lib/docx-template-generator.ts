@@ -567,8 +567,8 @@ function createImageParagraph(
 ): XmlElement {
   const naturalWidth = Math.max(1, Number(image.width) || 4)
   const naturalHeight = Math.max(1, Number(image.height) || 3)
-  const maxWidth = Math.max(1, Number(image.displayWidth) || 5.8)
-  const maxHeight = Math.max(1, Number(image.displayHeight) || 4.2)
+  const maxWidth = Math.max(1, Number(image.displayWidth) || 4.8)
+  const maxHeight = Math.max(1, Number(image.displayHeight) || 3)
   const scale = Math.min(maxWidth * 914400 / naturalWidth, maxHeight * 914400 / naturalHeight)
   const width = Math.round(naturalWidth * scale)
   const height = Math.round(naturalHeight * scale)
@@ -761,12 +761,15 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
     if (child !== sectionProperties) body.removeChild(child)
   }
 
-  const hasTitleSection = content.sections.some(section => section.type === 'title')
+  const hasTitleSection = Boolean(content.coverImage) || content.sections.some(section => section.type === 'title')
   const elements: XmlElement[] = []
   if (content.documentType === 'room_reservation') {
     elements.push(...roomReservationElements(document, content.intake?.fields ?? {}))
   } else if (content.title && !hasTitleSection) {
     elements.push(createParagraph(document, content.title, { bold: true, after: 160 }))
+  }
+  if (content.coverImage) {
+    await addItineraryImages(archive, document, [content.coverImage], elements)
   }
   elements.push(...documentIntakeElements(document, content))
   for (const section of content.sections) {
@@ -790,6 +793,9 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
         after: 80,
         size: 20,
       }))
+    }
+    if (content.closingLogo) {
+      await addItineraryImages(archive, document, [content.closingLogo], elements)
     }
   }
 

@@ -199,11 +199,11 @@ To add a document type, add its field schema and required-field rules to `BUSINE
    - **Attraction Subheadings**: Bold underlined Times New Roman `12pt`.
    - **Bullet Lists**: Native Word `List Bullet` paragraphs with zero after-spacing.
    - **Tables**: Styled with blue header bars and borders.
-   - **Closing**: Centered `****END OF SERVICES****`.
+   - **Closing**: A dedicated cancellation-policy page, centered `****END OF SERVICES****`, and Beyond Escapes contact details and logos.
 
 ### Finalized itinerary layout reference
 
-The supplied finalized itinerary was measured at approximately **1,356 words**, **8 A4 pages**, and **11 inline images**. Its opening page uses a route map of about **7.14 × 2.23 inches** and a feature image of about **3.73 × 4.72 inches**; destination photos are predominantly wide banners around **7.26 × 2.66 inches**. New itinerary exports target a similar concise, day-by-day style (about **1,200–1,450 words** for a typical week-long trip), add a generated Sri Lanka route-map graphic and an **Ayubowan | Welcome to Sri Lanka** page, and finish with the Beyond Escapes company contact block. Itineraries always use the official Beyond Escapes template; other document types continue to use the selected template. The official template header logos, blue `#3973B9` heading bars, and branded footer remain in place.
+The supplied finalized itinerary was measured at approximately **1,356 words**, **8 A4 pages**, and **11 inline images**. New itinerary exports use a single composed cover page with the title, Ayubowan welcome artwork, Sri Lanka route map, overview, and company details; destination photos are constrained to **4.8 × 3 inches** by default. Generated itinerary content targets about **1,350–1,650 words** for a typical week-long trip, with more detailed daily activity descriptions. A separate final page contains the cancellation policy, end-of-services marker, contact details, and Beyond Escapes logos. User-provided cancellation wording is preserved; if none is supplied, the page uses a neutral reminder instead of inventing fees or deadlines. Itineraries always use the official Beyond Escapes template; other document types continue to use the selected template. The official template header logos, blue `#3973B9` heading bars, and branded footer remain in place.
 
 ---
 

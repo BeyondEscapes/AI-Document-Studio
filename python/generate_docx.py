@@ -205,8 +205,8 @@ def add_document_images(doc, images):
         paragraph.paragraph_format.space_before = Pt(4)
         paragraph.paragraph_format.space_after = Pt(4)
         aspect_ratio = max(0.01, float(image.get('width', 1)) / max(1, float(image.get('height', 1))))
-        max_width = max(1, float(image.get('displayWidth') or 5.8))
-        max_height = max(1, float(image.get('displayHeight') or 4.2))
+        max_width = max(1, float(image.get('displayWidth') or 4.8))
+        max_height = max(1, float(image.get('displayHeight') or 3))
         width = min(max_width, max_height * aspect_ratio)
         picture = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(width))
         picture._inline.docPr.set('descr', str(image.get('altText') or image.get('caption') or 'Itinerary photo')[:500])
@@ -615,9 +615,11 @@ def generate_document(template_path: str, content: dict, output_path: str):
             add_data_table(doc, ['DETAIL', 'PROVIDED INFORMATION'], details)
 
     # Add title if provided and not already in sections
-    has_title_section = any(s.get('type') == 'title' for s in sections)
+    has_title_section = bool(content.get('coverImage')) or any(s.get('type') == 'title' for s in sections)
     if title and not has_title_section and document_type != 'room_reservation':
         add_title_paragraph(doc, title)
+    if content.get('coverImage'):
+        add_document_images(doc, [content['coverImage']])
     
     # Add each section
     for i, section in enumerate(sections):
@@ -691,6 +693,8 @@ def generate_document(template_path: str, content: dict, output_path: str):
             run = paragraph.add_run(line)
             run.font.name = 'Times New Roman'
             run.font.size = Pt(10)
+        if content.get('closingLogo'):
+            add_document_images(doc, [content['closingLogo']])
     
     # Save document
     doc.save(output_path)

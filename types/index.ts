@@ -35,6 +35,8 @@ export interface DocumentContent {
   sections: DocumentSection[]
   documentType?: BusinessDocumentType
   intake?: DocumentIntake
+  coverImage?: DocumentImage
+  closingLogo?: DocumentImage
   approval?: {
     status: 'draft' | 'approved'
     approvedAt?: string
