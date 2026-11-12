@@ -85,7 +85,7 @@ export const BUSINESS_DOCUMENT_TEMPLATES: Record<BusinessDocumentType, BusinessD
       { key: 'accommodation', label: 'Accommodation' },
       { key: 'transport', label: 'Transport' },
     ],
-    layout: 'Create a practical day-by-day itinerary from the supplied duration and route. Distinguish suggestions from confirmed services; do not invent traveler details, reservations, dates, prices, or provider confirmations.',
+    layout: 'Create a practical day-by-day itinerary from the supplied duration and route. For every day, use a day/date/route heading, a concise chronological bullet list of important activities, then attraction subheadings with descriptive paragraphs. Include both points and prose without repeating information. Use exact times only when supplied. Distinguish suggestions from confirmed services; do not invent traveler details, reservations, dates, prices, or provider confirmations.',
   },
   invoice: {
     label: 'Invoice',
