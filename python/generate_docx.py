@@ -346,7 +346,7 @@ def add_itinerary_cover(doc, content, cover):
         map_paragraph.paragraph_format.space_before = Pt(0)
         map_paragraph.paragraph_format.space_after = Pt(2)
         add_image_to_paragraph(map_paragraph, map_image, max_width=2.4, max_height=4.5)
-    attribution = cover.get('mapAttribution') or 'Illustrative route map - not to scale'
+    attribution = cover.get('mapAttribution') or 'Road map screenshot not saved'
     add_cover_cell_paragraph(map_cell, attribution, size=6, color=(102, 115, 126), alignment=WD_ALIGN_PARAGRAPH.CENTER, after=0)
 
     details_cell._element.remove(details_cell.paragraphs[0]._element)

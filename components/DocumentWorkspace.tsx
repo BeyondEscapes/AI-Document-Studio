@@ -52,6 +52,16 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
   })
 }
 
+function hasCurrentItineraryMap(content: DocumentContent): boolean {
+  const cover = content.itineraryPages?.cover
+  if (!cover?.mapImage) return false
+  if (!cover.mapRouteSignature) return true
+  const fields = content.intake?.fields ?? {}
+  const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim() || ''
+  const routeStops = cover.routeStops ?? getInitialRouteStops(routeText)
+  return cover.mapRouteSignature === JSON.stringify(routeStops)
+}
+
 export function DocumentWorkspace({
   documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate,
   onSaveDocument, saveStatus, onClose
@@ -105,6 +115,15 @@ export function DocumentWorkspace({
 
   const handleExport = async (format: 'docx' | 'pdf') => {
     if (!documentContent) return
+    if (documentContent.documentType === 'tour_itinerary' && !hasCurrentItineraryMap(documentContent)) {
+      setViewMode('edit')
+      setExportStatus(prev => ({
+        ...prev,
+        [format]: 'error',
+        [`${format}Error`]: 'A real road map matching the current stops is required. The map editor is opening to create or upload one; export again after it appears on the cover.',
+      }))
+      return
+    }
     
     setExportStatus(prev => ({
       ...prev,
@@ -799,9 +818,9 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
         <div className="grid grid-cols-[0.8fr_1.2fr] gap-3">
           <div className="rounded-md bg-[#F4F8F5] p-2">
             <p className="mb-1 text-center font-sans text-[9px] font-bold text-[#3973B9]">SRI LANKA ROUTE MAP</p>
-            <CoverMapPreview image={cover.mapImage} routeStops={routeStops} />
+            <CoverMapPreview image={cover.mapImage} />
             <p className="mt-1 text-center font-sans text-[7px] text-gray-500">
-              {cover.mapAttribution || 'Illustrative route map - not to scale'}
+              {cover.mapAttribution || 'Road map screenshot not saved'}
             </p>
           </div>
           <div className="space-y-2">
@@ -869,10 +888,8 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
 
 function CoverMapPreview({
   image,
-  routeStops,
 }: {
   image?: DocumentImage
-  routeStops: ItineraryRouteStop[]
 }) {
   if (image) {
     return (
@@ -888,15 +905,9 @@ function CoverMapPreview({
   }
 
   return (
-    <svg viewBox="0 0 220 310" role="img" aria-label="Illustrative Sri Lanka route map" className="mx-auto max-h-64 w-full">
-      <rect width="220" height="310" rx="8" fill="#eef5f8" />
-      <path d="M72 22 L109 29 L141 47 L158 72 L155 99 L174 122 L166 155 L153 177 L146 207 L128 232 L105 250 L82 243 L64 225 L54 194 L47 164 L49 132 L43 105 L51 76 L47 49Z" fill="#dbe9d7" stroke="#7ea881" strokeWidth="3" />
-      {routeStops.filter(stop => stop.latitude !== null && stop.longitude !== null).map((stop, index) => {
-        const x = 52 + ((stop.longitude! - 79.6) / 2.2) * 112
-        const y = 33 + ((9.9 - stop.latitude!) / 4.2) * 215
-        return <g key={`${stop.name}-${index}`}><circle cx={x} cy={y} r="8" fill="#3973B9" stroke="#fff" strokeWidth="2" /><text x={x} y={y + 3} textAnchor="middle" fill="#fff" fontSize="7" fontWeight="bold">{index + 1}</text></g>
-      })}
-    </svg>
+    <div role="status" className="mx-auto flex min-h-40 max-h-64 w-full items-center justify-center rounded bg-blue-50 px-3 text-center text-xs text-blue-800">
+      A real road map will appear here after the map editor generates or uploads one.
+    </div>
   )
 }
 
@@ -1276,6 +1287,7 @@ function ItineraryPagesEditor({
         <ItineraryMapEditor
           routeStops={routeStops}
           mapImage={cover.mapImage}
+          mapRouteSignature={cover.mapRouteSignature}
           onRouteStopsChange={onRouteStopsChange}
           onMapImageChange={onMapImageChange}
         />

@@ -14,6 +14,7 @@ const ROUTING_BASE_URL = process.env.NEXT_PUBLIC_OSRM_ROUTING_URL?.replace(/\/+$
 interface ItineraryMapEditorProps {
   routeStops: ItineraryRouteStop[]
   mapImage?: DocumentImage
+  mapRouteSignature?: string
   onRouteStopsChange: (stops: ItineraryRouteStop[]) => void
   onMapImageChange: (image: DocumentImage, attribution: string, routeSignature: string) => void
 }
@@ -96,6 +97,7 @@ function readMapImage(file: File): Promise<DocumentImage> {
 export default function ItineraryMapEditor({
   routeStops,
   mapImage,
+  mapRouteSignature,
   onRouteStopsChange,
   onMapImageChange,
 }: ItineraryMapEditorProps) {
@@ -115,6 +117,7 @@ export default function ItineraryMapEditor({
   const [placing, setPlacing] = useState<number | 'new' | null>(null)
   const [newStopName, setNewStopName] = useState('')
   const newStopNameRef = useRef(newStopName)
+  const autoRouteStartedRef = useRef(false)
 
   useEffect(() => {
     routeStopsRef.current = routeStops
@@ -355,6 +358,16 @@ export default function ItineraryMapEditor({
     if (routeReady) await captureMap(routeStops)
   }
 
+  useEffect(() => {
+    const currentRouteSignature = JSON.stringify(routeStops)
+    const mapMatchesRoute = Boolean(mapImage)
+      && (!mapRouteSignature || mapRouteSignature === currentRouteSignature)
+    if (!mapReady || mapMatchesRoute || autoRouteStartedRef.current) return
+    if (routeStops.length < 2 || routeStops.some(stop => stop.latitude === null || stop.longitude === null)) return
+    autoRouteStartedRef.current = true
+    void generateRoadRoute()
+  }, [mapReady, mapImage, mapRouteSignature, routeStops, generateRoadRoute])
+
   const applyMap = async () => {
     await captureMap(routeStops)
   }
@@ -463,7 +476,7 @@ export default function ItineraryMapEditor({
         </label>
       </div>
       <p className="mt-2 text-[9px] text-gray-500">
-        {mapImage ? 'A map image is included in the cover. Re-apply after changing stops.' : 'The cover uses an illustrative map until you apply a road map or upload your own.'}
+        {mapImage ? 'A map image is included in the cover. Re-apply after changing stops.' : 'The cover map is blank until you apply a road map or upload your own image.'}
         {' '}{OPENFREEMAP_ATTRIBUTION}
       </p>
     </section>

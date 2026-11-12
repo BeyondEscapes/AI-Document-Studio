@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
 import type { DocumentContent, DocumentImage, ItineraryClosingSettings, ItineraryCoverSettings, ItineraryRouteStop } from '@/types'
-import { createAyubowanArtworkImage, createIllustrativeRouteMapImage } from '@/lib/itinerary-map'
+import { createAyubowanArtworkImage } from '@/lib/itinerary-map'
 import { getInitialRouteStops } from '@/lib/itinerary-route'
 import { extractItinerarySections, getItineraryPageContent } from '@/lib/itinerary-page-content'
 
@@ -76,12 +76,11 @@ export async function addItineraryOpeningPages(content: DocumentContent): Promis
   const routeSignature = JSON.stringify(routeStops)
   const hasCurrentMap = Boolean(currentCover.mapImage)
     && (!currentCover.mapRouteSignature || currentCover.mapRouteSignature === routeSignature)
-  const mapImage = hasCurrentMap && currentCover.mapImage
-    ? currentCover.mapImage
-    : await createIllustrativeRouteMapImage(routeStops)
-  const mapAttribution = hasCurrentMap
-    ? currentCover.mapAttribution ?? 'Map image supplied by user'
-    : 'Illustrative route map - not to scale'
+  if (!hasCurrentMap || !currentCover.mapImage) {
+    throw new Error('A real road map screenshot is required. Generate or upload a map in the itinerary editor before exporting.')
+  }
+  const mapImage = currentCover.mapImage
+  const mapAttribution = currentCover.mapAttribution ?? 'Map image supplied by user'
   const [welcomeArtwork, logo] = await Promise.all([
     createAyubowanArtworkImage(),
     createClosingLogoImage(),

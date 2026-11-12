@@ -616,7 +616,7 @@ function createItineraryCoverTable(
   const mapCellElements = [
     createParagraph(document, 'SRI LANKA ROUTE MAP', { bold: true, color: BLUE, alignment: 'center', after: 80, size: 20 }),
     ...mapImageElements,
-    createParagraph(document, cover.mapAttribution ?? 'Illustrative route map - not to scale', {
+    createParagraph(document, cover.mapAttribution ?? 'Road map screenshot not saved', {
       color: '66737E',
       alignment: 'center',
       before: 40,
