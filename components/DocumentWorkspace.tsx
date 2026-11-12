@@ -10,7 +10,19 @@ import {
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel, getMissingRequiredFields } from '@/lib/business-documents'
 import { scoreItineraryImage, suggestItineraryImageMatches } from '@/lib/itinerary-images'
-import type { DocumentContent, DocumentImage, DocumentSection, DocumentTheme, ItineraryImageCatalogItem } from '@/types'
+import { getInitialRouteStops } from '@/lib/itinerary-route'
+import { extractItinerarySections, getItineraryPageContent } from '@/lib/itinerary-page-content'
+import ItineraryMapEditor from '@/components/ItineraryMapEditor'
+import type {
+  DocumentContent,
+  DocumentImage,
+  DocumentSection,
+  DocumentTheme,
+  ItineraryClosingSettings,
+  ItineraryCoverSettings,
+  ItineraryImageCatalogItem,
+  ItineraryRouteStop,
+} from '@/types'
 
 interface DocumentWorkspaceProps {
   documentContent: DocumentContent | null
@@ -227,8 +239,64 @@ export function DocumentWorkspace({
       fields: { ...documentContent.intake.fields, [key]: value },
     }
     intake.missingFields = getMissingRequiredFields(intake)
-    onDocumentUpdate(resetApproval({ ...documentContent, intake }))
+    let updated: DocumentContent = { ...documentContent, intake }
+    if (documentContent.documentType === 'tour_itinerary' && ['destinations', 'route', 'travelRoute'].includes(key)) {
+      const routeText = intake.fields.destinations || intake.fields.route || intake.fields.travelRoute || ''
+      updated = {
+        ...updated,
+        itineraryPages: {
+          ...documentContent.itineraryPages,
+          cover: {
+            ...documentContent.itineraryPages?.cover,
+            routeStops: getInitialRouteStops(routeText),
+            mapImage: undefined,
+            mapAttribution: undefined,
+            mapRouteSignature: undefined,
+          },
+        },
+      }
+    }
+    onDocumentUpdate(resetApproval(updated))
   }, [documentContent, onDocumentUpdate])
+
+  const handleCoverPageUpdate = useCallback((updates: Partial<ItineraryCoverSettings>) => {
+    if (!documentContent) return
+    onDocumentUpdate(resetApproval({
+      ...documentContent,
+      itineraryPages: {
+        ...documentContent.itineraryPages,
+        cover: { ...documentContent.itineraryPages?.cover, ...updates },
+      },
+    }))
+  }, [documentContent, onDocumentUpdate])
+
+  const handleClosingPageUpdate = useCallback((updates: Partial<ItineraryClosingSettings>) => {
+    if (!documentContent) return
+    onDocumentUpdate(resetApproval({
+      ...documentContent,
+      itineraryPages: {
+        ...documentContent.itineraryPages,
+        closing: { ...documentContent.itineraryPages?.closing, ...updates },
+      },
+    }))
+  }, [documentContent, onDocumentUpdate])
+
+  const handleRouteStopsChange = useCallback((routeStops: ItineraryRouteStop[]) => {
+    handleCoverPageUpdate({
+      routeStops,
+      mapImage: undefined,
+      mapAttribution: undefined,
+      mapRouteSignature: undefined,
+    })
+  }, [handleCoverPageUpdate])
+
+  const handleMapImageChange = useCallback((
+    mapImage: DocumentImage,
+    mapAttribution: string,
+    mapRouteSignature: string
+  ) => {
+    handleCoverPageUpdate({ mapImage, mapAttribution, mapRouteSignature })
+  }, [handleCoverPageUpdate])
 
   const addImageToSection = useCallback((sectionId: string, image: DocumentImage) => {
     if (!documentContent) return
@@ -400,7 +468,7 @@ export function DocumentWorkspace({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full min-h-0 bg-white">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 h-14">
         <FileText size={15} className="text-blue-500 flex-shrink-0" />
@@ -460,7 +528,7 @@ export function DocumentWorkspace({
       </div>
 
       {/* Document Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {documentContent.documentType === 'tour_itinerary' && (
           <div className="px-4 pt-3">
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-2.5">
@@ -495,6 +563,10 @@ export function DocumentWorkspace({
             onAddSection={handleAddSection}
             onTitleChange={handleTitleChange}
             onIntakeFieldUpdate={handleIntakeFieldUpdate}
+            onCoverPageUpdate={handleCoverPageUpdate}
+            onClosingPageUpdate={handleClosingPageUpdate}
+            onRouteStopsChange={handleRouteStopsChange}
+            onMapImageChange={handleMapImageChange}
             onImagePick={setImagePickerSectionId}
             onImageUpload={handleUploadImage}
             onImageRemove={handleRemoveImage}
@@ -504,7 +576,7 @@ export function DocumentWorkspace({
       </div>
 
       {/* Export Panel */}
-      <div className="border-t border-gray-200 px-4 py-3 bg-white">
+      <div className="shrink-0 max-h-[35vh] overflow-y-auto border-t border-gray-200 px-4 py-3 bg-white">
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={handleSaveLocally}
@@ -639,6 +711,10 @@ export function DocumentWorkspace({
 
 // Document Preview Component
 function DocumentPreview({ documentContent }: { documentContent: DocumentContent }) {
+  if (documentContent.documentType === 'tour_itinerary') {
+    return <ItineraryDocumentPreview documentContent={documentContent} />
+  }
+
   const documentType = documentContent.documentType
   const documentLabel = documentType ? BUSINESS_DOCUMENT_TEMPLATES[documentType].label : 'Travel Document'
   const isRoomReservation = documentType === 'room_reservation'
@@ -665,7 +741,7 @@ function DocumentPreview({ documentContent }: { documentContent: DocumentContent
         {!isRoomReservation && <h1 className="text-lg font-bold text-gray-900 font-serif">{documentContent.title}</h1>}
       </div>
 
-      {documentContent.intake && documentContent.documentType !== 'tour_itinerary' && (
+      {documentContent.intake && (
         <DocumentIntakePreview intake={documentContent.intake} />
       )}
 
@@ -681,6 +757,146 @@ function DocumentPreview({ documentContent }: { documentContent: DocumentContent
         <p className="text-xs text-gray-500 font-medium">BEYOND ESCAPES | SRI LANKA</p>
       </div>
     </div>
+  )
+}
+
+function ItineraryDocumentPreview({ documentContent }: { documentContent: DocumentContent }) {
+  const pageContent = getItineraryPageContent(documentContent)
+  const sections = extractItinerarySections(documentContent.sections).remaining
+  const fields = documentContent.intake?.fields ?? {}
+  const cover = documentContent.itineraryPages?.cover ?? {}
+  const closing = documentContent.itineraryPages?.closing ?? {}
+  const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim()
+  const routeStops = cover.routeStops ?? getInitialRouteStops(routeText)
+  const routePlan = routeText || routeStops.map(stop => stop.name).join(' - ')
+  const itinerarySections = sections.at(-1)?.type === 'page_break' ? sections.slice(0, -1) : sections
+
+  return (
+    <div className="space-y-5 p-5 max-w-3xl mx-auto">
+      <article className="overflow-hidden rounded-lg border border-gray-200 bg-white p-5 shadow-sm doc-preview">
+        <div className="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
+          <Image
+            src="/images/beyond_escapes_logo.png"
+            alt="Beyond Escapes"
+            width={220}
+            height={36}
+            className="h-8 w-auto object-contain object-left"
+          />
+          <div className="text-right font-sans">
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-blue-700">Tour Itinerary</p>
+            <p className="text-[8px] text-gray-500">Beyond Escapes | Sri Lanka</p>
+          </div>
+        </div>
+        <h1 className="mb-2 text-center font-serif text-xl font-bold text-[#3973B9]">{documentContent.title}</h1>
+        <Image
+          src="/images/sri-lanka-ayubowan.svg"
+          alt="Illustration of a warm Sri Lankan welcome"
+          width={1500}
+          height={410}
+          className="mb-1 h-auto max-h-40 w-full rounded-md object-cover"
+        />
+        <p className="mb-3 text-center font-serif text-sm font-bold text-[#668678]">Ayubowan | Welcome to Sri Lanka</p>
+        <div className="grid grid-cols-[0.8fr_1.2fr] gap-3">
+          <div className="rounded-md bg-[#F4F8F5] p-2">
+            <p className="mb-1 text-center font-sans text-[9px] font-bold text-[#3973B9]">SRI LANKA ROUTE MAP</p>
+            <CoverMapPreview image={cover.mapImage} routeStops={routeStops} />
+            <p className="mt-1 text-center font-sans text-[7px] text-gray-500">
+              {cover.mapAttribution || 'Illustrative route map - not to scale'}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div>
+              <h2 className="text-[11px] font-bold text-[#3973B9]">YOUR JOURNEY AT A GLANCE</h2>
+              <p className="text-[9px] leading-relaxed text-gray-700">{pageContent.overview}</p>
+            </div>
+            <div>
+              <h2 className="text-[10px] font-bold text-[#668678]">A WARM WELCOME</h2>
+              <p className="text-[9px] leading-relaxed text-gray-700">{pageContent.welcome}</p>
+            </div>
+            {routePlan && (
+              <div>
+                <h2 className="text-[10px] font-bold text-[#3973B9]">ROUTE PLAN</h2>
+                <p className="text-[9px] font-semibold text-gray-700">{routePlan}</p>
+              </div>
+            )}
+            <div className="text-[8px] leading-relaxed text-gray-600">
+              {fields.tripDuration && <p>Trip duration: {fields.tripDuration}</p>}
+              {fields.travelDates && <p>Travel dates: {fields.travelDates}</p>}
+              <p>Prepared by: {pageContent.preparedBy}</p>
+              <p>{closing.phone ?? '+94 112 579 679'}</p>
+              <p>{closing.email ?? 'tours@beyondescapes.com'}</p>
+            </div>
+          </div>
+        </div>
+        <p className="mt-3 border-t border-gray-100 pt-2 text-center font-sans text-[8px] text-gray-400">Page 1 | Editable cover page</p>
+      </article>
+
+      <article className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <p className="mb-3 font-sans text-[9px] font-semibold uppercase tracking-wide text-blue-700">Itinerary details</p>
+        <div className="space-y-1 doc-preview">
+          {itinerarySections.map(section => <SectionPreview key={section.id} section={section} />)}
+        </div>
+      </article>
+
+      <article className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm doc-preview">
+        <Image
+          src="/images/beyond_escapes_logo.png"
+          alt="Beyond Escapes"
+          width={220}
+          height={36}
+          className="mx-auto mb-4 h-9 w-auto object-contain"
+        />
+        <div className="rounded-sm bg-[#3973B9] px-3 py-1.5 text-center font-sans text-xs font-bold text-white">
+          CANCELLATION POLICY
+        </div>
+        <ul className="my-4 space-y-2 text-xs text-gray-700">
+          {pageContent.cancellationPolicy.map((item, index) => <li key={index}>• {item}</li>)}
+        </ul>
+        <p className="my-6 text-center text-xs font-bold">****END OF SERVICES****</p>
+        <div className="rounded-sm bg-[#3973B9] px-3 py-1.5 text-center font-sans text-xs font-bold text-white">
+          {pageContent.companyName}
+        </div>
+        <div className="mt-2 space-y-1 text-center text-[10px] text-gray-600">
+          <p>{pageContent.phone}</p>
+          <p>{pageContent.email}</p>
+          <p>{pageContent.address}</p>
+        </div>
+        <p className="mt-3 text-center font-sans text-[8px] text-gray-400">Final page | Editable cancellation and contact details</p>
+      </article>
+    </div>
+  )
+}
+
+function CoverMapPreview({
+  image,
+  routeStops,
+}: {
+  image?: DocumentImage
+  routeStops: ItineraryRouteStop[]
+}) {
+  if (image) {
+    return (
+      <Image
+        src={image.src}
+        alt={image.altText}
+        width={image.width}
+        height={image.height}
+        unoptimized
+        className="max-h-64 w-full rounded object-contain"
+      />
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 220 310" role="img" aria-label="Illustrative Sri Lanka route map" className="mx-auto max-h-64 w-full">
+      <rect width="220" height="310" rx="8" fill="#eef5f8" />
+      <path d="M72 22 L109 29 L141 47 L158 72 L155 99 L174 122 L166 155 L153 177 L146 207 L128 232 L105 250 L82 243 L64 225 L54 194 L47 164 L49 132 L43 105 L51 76 L47 49Z" fill="#dbe9d7" stroke="#7ea881" strokeWidth="3" />
+      {routeStops.filter(stop => stop.latitude !== null && stop.longitude !== null).map((stop, index) => {
+        const x = 52 + ((stop.longitude! - 79.6) / 2.2) * 112
+        const y = 33 + ((9.9 - stop.latitude!) / 4.2) * 215
+        return <g key={`${stop.name}-${index}`}><circle cx={x} cy={y} r="8" fill="#3973B9" stroke="#fff" strokeWidth="2" /><text x={x} y={y + 3} textAnchor="middle" fill="#fff" fontSize="7" fontWeight="bold">{index + 1}</text></g>
+      })}
+    </svg>
   )
 }
 
@@ -917,6 +1133,10 @@ function DocumentEditor({
   onAddSection,
   onTitleChange,
   onIntakeFieldUpdate,
+  onCoverPageUpdate,
+  onClosingPageUpdate,
+  onRouteStopsChange,
+  onMapImageChange,
   onImagePick,
   onImageUpload,
   onImageRemove,
@@ -928,11 +1148,19 @@ function DocumentEditor({
   onAddSection: (afterId: string, type: DocumentSection['type']) => void
   onTitleChange: (title: string) => void
   onIntakeFieldUpdate: (key: string, value: string) => void
+  onCoverPageUpdate: (updates: Partial<ItineraryCoverSettings>) => void
+  onClosingPageUpdate: (updates: Partial<ItineraryClosingSettings>) => void
+  onRouteStopsChange: (stops: ItineraryRouteStop[]) => void
+  onMapImageChange: (image: DocumentImage, attribution: string, routeSignature: string) => void
   onImagePick: (sectionId: string) => void
   onImageUpload: (sectionId: string, file: File) => void
   onImageRemove: (sectionId: string, index: number) => void
   uploadingImageSectionId: string | null
 }) {
+  const sectionsToEdit = documentContent.documentType === 'tour_itinerary'
+    ? extractItinerarySections(documentContent.sections).remaining
+    : documentContent.sections
+
   return (
     <div className="p-4 space-y-2">
       {documentContent.intake && (
@@ -954,8 +1182,18 @@ function DocumentEditor({
         />
       </div>
 
+      {documentContent.documentType === 'tour_itinerary' && (
+        <ItineraryPagesEditor
+          documentContent={documentContent}
+          onCoverPageUpdate={onCoverPageUpdate}
+          onClosingPageUpdate={onClosingPageUpdate}
+          onRouteStopsChange={onRouteStopsChange}
+          onMapImageChange={onMapImageChange}
+        />
+      )}
+
       {/* Sections */}
-      {documentContent.sections.map((section, idx) => (
+      {sectionsToEdit.map(section => (
         <SectionEditor
           key={section.id}
           section={section}
@@ -972,10 +1210,120 @@ function DocumentEditor({
 
       {/* Add Section Button */}
       <AddSectionButton onAdd={(type) => {
-        const lastId = documentContent.sections[documentContent.sections.length - 1]?.id || 'none'
+        const lastId = sectionsToEdit[sectionsToEdit.length - 1]?.id || 'none'
         onAddSection(lastId, type)
       }} />
     </div>
+  )
+}
+
+function ItineraryPagesEditor({
+  documentContent,
+  onCoverPageUpdate,
+  onClosingPageUpdate,
+  onRouteStopsChange,
+  onMapImageChange,
+}: {
+  documentContent: DocumentContent
+  onCoverPageUpdate: (updates: Partial<ItineraryCoverSettings>) => void
+  onClosingPageUpdate: (updates: Partial<ItineraryClosingSettings>) => void
+  onRouteStopsChange: (stops: ItineraryRouteStop[]) => void
+  onMapImageChange: (image: DocumentImage, attribution: string, routeSignature: string) => void
+}) {
+  const pageContent = getItineraryPageContent(documentContent)
+  const cover = documentContent.itineraryPages?.cover ?? {}
+  const closing = documentContent.itineraryPages?.closing ?? {}
+  const fields = documentContent.intake?.fields ?? {}
+  const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim() || ''
+  const routeStops = cover.routeStops ?? getInitialRouteStops(routeText)
+
+  return (
+    <section className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+      <div>
+        <h3 className="text-xs font-semibold text-blue-900">Cover & final page editor</h3>
+        <p className="text-[10px] text-blue-700">These fields stay editable in Word. Artwork and maps are images only.</p>
+      </div>
+
+      <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+        <h4 className="text-[11px] font-semibold text-gray-800">First page</h4>
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">Journey overview</span>
+          <textarea
+            value={pageContent.overview}
+            onChange={event => onCoverPageUpdate({ overview: event.target.value })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">Ayubowan welcome message</span>
+          <textarea
+            value={pageContent.welcome}
+            onChange={event => onCoverPageUpdate({ welcome: event.target.value })}
+            rows={3}
+            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">Prepared by</span>
+          <input
+            value={cover.preparedBy ?? pageContent.preparedBy}
+            onChange={event => onCoverPageUpdate({ preparedBy: event.target.value })}
+            className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+          />
+        </label>
+
+        <ItineraryMapEditor
+          routeStops={routeStops}
+          mapImage={cover.mapImage}
+          onRouteStopsChange={onRouteStopsChange}
+          onMapImageChange={onMapImageChange}
+        />
+        {cover.mapImage && (
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-medium text-gray-600">Map attribution / source</span>
+            <input
+              value={cover.mapAttribution ?? ''}
+              onChange={event => onCoverPageUpdate({ mapAttribution: event.target.value })}
+              className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            />
+          </label>
+        )}
+      </div>
+
+      <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+        <h4 className="text-[11px] font-semibold text-gray-800">Last page</h4>
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">Cancellation policy (one term per line)</span>
+          <textarea
+            value={pageContent.cancellationPolicy.join('\n')}
+            onChange={event => onClosingPageUpdate({
+              cancellationPolicy: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+          />
+        </label>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {([
+            ['companyName', 'Company name', pageContent.companyName],
+            ['phone', 'Phone', pageContent.phone],
+            ['email', 'Email / website', pageContent.email],
+            ['address', 'Address', pageContent.address],
+          ] as const).map(([key, label, value]) => (
+            <label key={key} className="block">
+              <span className="mb-1 block text-[10px] font-medium text-gray-600">{label}</span>
+              <textarea
+                value={value}
+                onChange={event => onClosingPageUpdate({ [key]: event.target.value })}
+                rows={key === 'address' ? 2 : 1}
+                className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 

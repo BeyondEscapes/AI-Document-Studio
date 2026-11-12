@@ -208,7 +208,7 @@ export default function StudioPage() {
       />
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Chat Panel */}
         <div className={`flex flex-col ${isDocPanelOpen ? 'w-[480px]' : 'flex-1'} min-w-0 border-r border-gray-200`}>
           <ChatPanel
@@ -224,7 +224,7 @@ export default function StudioPage() {
 
         {/* Document Workspace */}
         {isDocPanelOpen && (
-          <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
             <DocumentWorkspace
               documentContent={documentContent}
               themes={themes}

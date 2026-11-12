@@ -26,6 +26,8 @@ A professional, local AI-powered document creation web application. Users chat w
    - Review and approve documents, save changes locally, and export editable DOCX or PDF.
    - Template switcher (Beyond Escapes Official and custom uploaded templates).
    - Itinerary destination photos are matched automatically from the bundled image library or added from the device; selected photos are embedded in DOCX/PDF exports.
+   - Itinerary cover and final-page copy, cancellation terms, and company contacts have dedicated editors; the Word copy remains editable text.
+   - Road maps use a free OpenFreeMap/MapLibre map with OSRM road routing, editable waypoints, manual point placement, and map-image upload fallback.
 
 5. **Local Persistence & Privacy**
    - Fast SQLite database (`studio.db`) stores conversations, messages, document states, custom templates, and settings.
@@ -203,7 +205,9 @@ To add a document type, add its field schema and required-field rules to `BUSINE
 
 ### Finalized itinerary layout reference
 
-The supplied finalized itinerary was measured at approximately **1,356 words**, **8 A4 pages**, and **11 inline images**. New itinerary exports use a single composed cover page with the title, Ayubowan welcome artwork, Sri Lanka route map, overview, and company details; destination photos are constrained to **4.8 × 3 inches** by default. Generated itinerary content targets about **1,350–1,650 words** for a typical week-long trip, with more detailed daily activity descriptions. A separate final page contains the cancellation policy, end-of-services marker, contact details, and Beyond Escapes logos. User-provided cancellation wording is preserved; if none is supplied, the page uses a neutral reminder instead of inventing fees or deadlines. Itineraries always use the official Beyond Escapes template; other document types continue to use the selected template. The official template header logos, blue `#3973B9` heading bars, and branded footer remain in place.
+The supplied finalized itinerary was measured at approximately **1,356 words**, **8 A4 pages**, and **11 inline images**. New itinerary exports use a branded cover with editable Word title, overview, welcome, route, and contact text; only the Ayubowan artwork and route map are images. The editor includes dedicated first- and last-page controls and previews. Destination photos are constrained to **4.8 × 3 inches** by default. Generated itinerary content targets about **1,350–1,650 words** for a typical week-long trip, with more detailed daily activity descriptions. A separate final page contains editable cancellation wording, the end-of-services marker, contact details, and Beyond Escapes logos.
+
+The route editor uses the no-key OpenFreeMap Liberty style through MapLibre GL and displays map attribution on the exported page. It can ask the public OSRM demo server for a road-following route; that service is best-effort and has no availability guarantee. When routing is unavailable, users can place and reorder stops manually or upload a prepared map image. The visible direct-line fallback is labeled as not road-routed. For production routing reliability, set `NEXT_PUBLIC_OSRM_ROUTING_URL` to an appropriately hosted OSRM-compatible endpoint. Itineraries always use the official Beyond Escapes template; other document types continue to use the selected template. The official template header logos, blue `#3973B9` heading bars, and branded footer remain in place.
 
 ---
 

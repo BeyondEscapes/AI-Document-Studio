@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "scripts": {
         "lint": "next lint",
-        "build": "next build",
-        "dev": "next dev",
+        "build": "node scripts/copy-maplibre-worker.mjs && next build",
+        "dev": "node scripts/copy-maplibre-worker.mjs && next dev",
         "start": "next start",
         "import:itinerary-images": "node scripts/import-itinerary-images.mjs"
     },
@@ -22,6 +22,7 @@
         "better-sqlite3": "^13.0.3",
         "jszip": "^3.10.2",
         "lucide-react": "^1.70.0",
+        "maplibre-gl": "^6.18.0",
         "next": "^16.4.5",
         "postcss": "^8.5.32",
         "react": "^19.3.1",

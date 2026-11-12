@@ -20,6 +20,37 @@ export interface DocumentImage {
   displayHeight?: number
 }
 
+export interface ItineraryRouteStop {
+  name: string
+  latitude: number | null
+  longitude: number | null
+}
+
+export interface ItineraryCoverSettings {
+  overview?: string
+  welcome?: string
+  preparedBy?: string
+  routeStops?: ItineraryRouteStop[]
+  mapImage?: DocumentImage
+  mapAttribution?: string
+  mapRouteSignature?: string
+  welcomeArtwork?: DocumentImage
+}
+
+export interface ItineraryClosingSettings {
+  cancellationPolicy?: string[]
+  companyName?: string
+  phone?: string
+  email?: string
+  address?: string
+  logo?: DocumentImage
+}
+
+export interface ItineraryPageSettings {
+  cover?: ItineraryCoverSettings
+  closing?: ItineraryClosingSettings
+}
+
 export interface ItineraryImageCatalogItem {
   id: string
   title: string
@@ -35,6 +66,7 @@ export interface DocumentContent {
   sections: DocumentSection[]
   documentType?: BusinessDocumentType
   intake?: DocumentIntake
+  itineraryPages?: ItineraryPageSettings
   coverImage?: DocumentImage
   closingLogo?: DocumentImage
   approval?: {

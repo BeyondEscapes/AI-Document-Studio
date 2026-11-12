@@ -52,3 +52,5 @@ Thumbs.db
 
 # Temp inspection directories
 assets/docx_inspect/
+public/maplibre-gl-worker.mjs
+public/maplibre-gl-worker-LICENSE.txt

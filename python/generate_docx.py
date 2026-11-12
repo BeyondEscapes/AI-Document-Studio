@@ -177,40 +177,49 @@ def add_regular_paragraph(doc, text: str):
     return para
 
 
+def decode_document_image(image):
+    if not isinstance(image, dict):
+        raise ValueError('Document images must be objects containing image data.')
+    source = image.get('src', '')
+    match = re.fullmatch(r'data:image/(?:jpeg|png);base64,([A-Za-z0-9+/=\r\n]+)', source)
+    if not match:
+        raise ValueError('Document image data must be an embedded JPEG or PNG.')
+
+    encoded = match.group(1)
+    if len(encoded) > 12 * 1024 * 1024:
+        raise ValueError('Document images must be 9 MB or smaller after optimization.')
+    try:
+        image_bytes = base64.b64decode(encoded, validate=True)
+    except binascii.Error as error:
+        raise ValueError('Document image data is not valid base64.') from error
+    if not image_bytes or len(image_bytes) > 9 * 1024 * 1024:
+        raise ValueError('Document images must be non-empty and 9 MB or smaller.')
+    if source.startswith('data:image/jpeg;') and image_bytes.startswith(b'\xff\xd8'):
+        if image_bytes[2:4] not in (b'\xff\xe0', b'\xff\xe1'):
+            jfif_header = bytes.fromhex('ffe000104a46494600010100000100010000')
+            image_bytes = image_bytes[:2] + jfif_header + image_bytes[2:]
+    return image_bytes
+
+
+def add_image_to_paragraph(paragraph, image, max_width=None, max_height=None):
+    image_bytes = decode_document_image(image)
+    aspect_ratio = max(0.01, float(image.get('width', 1)) / max(1, float(image.get('height', 1))))
+    width_limit = max_width or max(1, float(image.get('displayWidth') or 4.8))
+    height_limit = max_height or max(1, float(image.get('displayHeight') or 3))
+    width = min(width_limit, height_limit * aspect_ratio)
+    picture = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(width))
+    picture._inline.docPr.set('descr', str(image.get('altText') or image.get('caption') or 'Itinerary photo')[:500])
+    picture._inline.docPr.set('title', str(image.get('caption') or image.get('altText') or 'Itinerary photo')[:255])
+    return picture
+
+
 def add_document_images(doc, images):
     for image in images:
-        if not isinstance(image, dict):
-            raise ValueError('Document images must be objects containing image data.')
-        source = image.get('src', '')
-        match = re.fullmatch(r'data:image/(?:jpeg|png);base64,([A-Za-z0-9+/=\r\n]+)', source)
-        if not match:
-            raise ValueError('Document image data must be an embedded JPEG or PNG.')
-
-        encoded = match.group(1)
-        if len(encoded) > 12 * 1024 * 1024:
-            raise ValueError('Document images must be 9 MB or smaller after optimization.')
-        try:
-            image_bytes = base64.b64decode(encoded, validate=True)
-        except binascii.Error as error:
-            raise ValueError('Document image data is not valid base64.') from error
-        if not image_bytes or len(image_bytes) > 9 * 1024 * 1024:
-            raise ValueError('Document images must be non-empty and 9 MB or smaller.')
-        if source.startswith('data:image/jpeg;') and image_bytes.startswith(b'\xff\xd8'):
-            if image_bytes[2:4] not in (b'\xff\xe0', b'\xff\xe1'):
-                jfif_header = bytes.fromhex('ffe000104a46494600010100000100010000')
-                image_bytes = image_bytes[:2] + jfif_header + image_bytes[2:]
-
         paragraph = doc.add_paragraph()
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraph.paragraph_format.space_before = Pt(4)
         paragraph.paragraph_format.space_after = Pt(4)
-        aspect_ratio = max(0.01, float(image.get('width', 1)) / max(1, float(image.get('height', 1))))
-        max_width = max(1, float(image.get('displayWidth') or 4.8))
-        max_height = max(1, float(image.get('displayHeight') or 3))
-        width = min(max_width, max_height * aspect_ratio)
-        picture = paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(width))
-        picture._inline.docPr.set('descr', str(image.get('altText') or image.get('caption') or 'Itinerary photo')[:500])
-        picture._inline.docPr.set('title', str(image.get('caption') or image.get('altText') or 'Itinerary photo')[:255])
+        add_image_to_paragraph(paragraph, image)
         caption = image.get('caption')
         if caption:
             caption_paragraph = doc.add_paragraph()
@@ -238,6 +247,185 @@ def add_title_paragraph(doc, text: str, branded=False):
         run.font.color.rgb = RGBColor(0x39, 0x73, 0xB9)
     
     return para
+
+
+def add_cover_cell_paragraph(cell, text, size=9, color=(35, 49, 66), bold=False, after=3, before=0, alignment=None):
+    para = cell.add_paragraph()
+    para.paragraph_format.space_before = Pt(before)
+    para.paragraph_format.space_after = Pt(after)
+    para.paragraph_format.line_spacing = Pt(size + 1)
+    if alignment is not None:
+        para.alignment = alignment
+    run = para.add_run(text)
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(size)
+    run.font.bold = bold
+    run.font.color.rgb = RGBColor(*color)
+    return para
+
+
+def set_cell_margins(cell, top=90, start=90, bottom=90, end=90):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    margins = OxmlElement('w:tcMar')
+    for edge, value in (('top', top), ('start', start), ('bottom', bottom), ('end', end)):
+        margin = OxmlElement(f'w:{edge}')
+        margin.set(qn('w:w'), str(value))
+        margin.set(qn('w:type'), 'dxa')
+        margins.append(margin)
+    tc_pr.append(margins)
+
+
+def set_cell_fill(cell, fill):
+    shading = OxmlElement('w:shd')
+    shading.set(qn('w:val'), 'clear')
+    shading.set(qn('w:color'), 'auto')
+    shading.set(qn('w:fill'), fill)
+    cell._tc.get_or_add_tcPr().append(shading)
+
+
+def set_table_borders_hidden(table):
+    borders = OxmlElement('w:tblBorders')
+    for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+        border = OxmlElement(f'w:{edge}')
+        border.set(qn('w:val'), 'nil')
+        borders.append(border)
+    table._tbl.tblPr.append(borders)
+
+
+def add_itinerary_cover(doc, content, cover):
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.paragraph_format.space_before = Pt(4)
+    title.paragraph_format.space_after = Pt(5)
+    title_run = title.add_run(content.get('title') or 'TOUR OF SRI LANKA')
+    title_run.font.name = 'Times New Roman'
+    title_run.font.bold = True
+    title_run.font.size = Pt(18)
+    title_run.font.color.rgb = RGBColor(0x39, 0x73, 0xB9)
+
+    artwork = cover.get('welcomeArtwork')
+    if artwork:
+        add_document_images(doc, [artwork])
+    welcome_heading = doc.add_paragraph()
+    welcome_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    welcome_heading.paragraph_format.space_before = Pt(0)
+    welcome_heading.paragraph_format.space_after = Pt(5)
+    welcome_run = welcome_heading.add_run('Ayubowan | Welcome to Sri Lanka')
+    welcome_run.font.name = 'Times New Roman'
+    welcome_run.font.bold = True
+    welcome_run.font.size = Pt(12)
+    welcome_run.font.color.rgb = RGBColor(0x66, 0x86, 0x78)
+
+    table = doc.add_table(rows=1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    table.columns[0].width = Inches(2.55)
+    table.columns[1].width = Inches(4.22)
+    set_table_borders_hidden(table)
+    map_cell, details_cell = table.rows[0].cells
+    map_cell.width = Inches(2.55)
+    details_cell.width = Inches(4.22)
+    map_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+    details_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+    set_cell_margins(map_cell)
+    set_cell_margins(details_cell)
+    set_cell_fill(map_cell, 'F4F8F5')
+
+    heading = map_cell.paragraphs[0]
+    heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    heading.paragraph_format.space_after = Pt(4)
+    heading_run = heading.add_run('SRI LANKA ROUTE MAP')
+    heading_run.font.name = 'Times New Roman'
+    heading_run.font.bold = True
+    heading_run.font.size = Pt(10)
+    heading_run.font.color.rgb = RGBColor(0x39, 0x73, 0xB9)
+    map_image = cover.get('mapImage')
+    if map_image:
+        map_paragraph = map_cell.add_paragraph()
+        map_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        map_paragraph.paragraph_format.space_before = Pt(0)
+        map_paragraph.paragraph_format.space_after = Pt(2)
+        add_image_to_paragraph(map_paragraph, map_image, max_width=2.4, max_height=4.5)
+    attribution = cover.get('mapAttribution') or 'Illustrative route map - not to scale'
+    add_cover_cell_paragraph(map_cell, attribution, size=6, color=(102, 115, 126), alignment=WD_ALIGN_PARAGRAPH.CENTER, after=0)
+
+    details_cell._element.remove(details_cell.paragraphs[0]._element)
+    fields = dict((content.get('intake') or {}).get('fields') or {})
+    closing = (content.get('itineraryPages') or {}).get('closing') or {}
+    if 'phone' in closing:
+        fields['phone'] = closing.get('phone')
+    if 'email' in closing:
+        fields['email'] = closing.get('email')
+    add_cover_cell_paragraph(details_cell, 'YOUR JOURNEY AT A GLANCE', size=10, color=(0x39, 0x73, 0xB9), bold=True, after=3)
+    add_cover_cell_paragraph(details_cell, cover.get('overview', ''), size=9, after=5)
+    add_cover_cell_paragraph(details_cell, 'A WARM WELCOME', size=9.5, color=(0x66, 0x86, 0x78), bold=True, after=2)
+    add_cover_cell_paragraph(details_cell, cover.get('welcome', ''), size=8.5, after=5)
+
+    route_text = fields.get('destinations', '').strip() or fields.get('route', '').strip() or fields.get('travelRoute', '').strip()
+    if not route_text:
+        route_text = ' - '.join(stop.get('name', '') for stop in cover.get('routeStops', []) if stop.get('name'))
+    if route_text:
+        add_cover_cell_paragraph(details_cell, 'ROUTE PLAN', size=9, color=(0x39, 0x73, 0xB9), bold=True, after=2)
+        add_cover_cell_paragraph(details_cell, route_text, size=8.5, bold=True, after=4)
+
+    trip_details = [
+        f"Trip duration: {fields.get('tripDuration', '').strip()}" if fields.get('tripDuration', '').strip() else '',
+        f"Travel dates: {fields.get('travelDates', '').strip()}" if fields.get('travelDates', '').strip() else '',
+        f"Prepared by: {cover.get('preparedBy', '').strip()}" if cover.get('preparedBy', '').strip() else '',
+    ]
+    trip_details = [line for line in trip_details if line]
+    if trip_details:
+        add_cover_cell_paragraph(details_cell, '\n'.join(trip_details), size=8, after=4)
+    contacts = [
+        fields.get('phone', '+94 112 579 679'),
+        fields.get('email', 'tours@beyondescapes.com'),
+    ]
+    contacts = [line.strip() for line in contacts if isinstance(line, str) and line.strip()]
+    add_cover_cell_paragraph(details_cell, '\n'.join(contacts), size=8, color=(53, 72, 91), after=0)
+
+
+def add_itinerary_closing(doc, closing):
+    add_blue_heading_bar(doc, 'CANCELLATION POLICY')
+    policy = closing.get('cancellationPolicy')
+    if policy is None:
+        policy = [
+            'Please refer to the cancellation terms provided for this itinerary. Any applicable fees and deadlines are subject to those agreed terms.'
+        ]
+    for item in policy:
+        if not str(item).strip():
+            continue
+        para = add_bullet_paragraph(doc, str(item))
+        for run in para.runs:
+            run.font.size = Pt(10)
+        para.paragraph_format.space_after = Pt(3)
+
+    end_para = doc.add_paragraph()
+    end_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    end_para.paragraph_format.space_before = Pt(16)
+    end_para.paragraph_format.space_after = Pt(10)
+    end_run = end_para.add_run('****END OF SERVICES****')
+    end_run.font.name = 'Times New Roman'
+    end_run.font.bold = True
+    end_run.font.size = Pt(11)
+
+    add_blue_heading_bar(doc, closing.get('companyName') or 'BEYOND ESCAPES PRIVATE LIMITED')
+    for line in (closing.get('phone'), closing.get('email'), closing.get('address')):
+        if not isinstance(line, str) or not line.strip():
+            continue
+        paragraph = doc.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.space_before = Pt(3)
+        paragraph.paragraph_format.space_after = Pt(3)
+        run = paragraph.add_run(line)
+        run.font.name = 'Times New Roman'
+        run.font.size = Pt(9)
+    logo = closing.get('logo') or content.get('closingLogo')
+    if logo:
+        paragraph = doc.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.space_before = Pt(6)
+        paragraph.paragraph_format.space_after = Pt(0)
+        add_image_to_paragraph(paragraph, logo, max_width=3.6, max_height=0.75)
 
 
 def add_data_table(doc, headers, rows):
@@ -592,6 +780,9 @@ def generate_document(template_path: str, content: dict, output_path: str):
     document_type = content.get('documentType')
     intake = content.get('intake') or {}
     fields = intake.get('fields') or {}
+    itinerary_pages = content.get('itineraryPages') or {}
+    itinerary_cover = itinerary_pages.get('cover') or {}
+    itinerary_closing = itinerary_pages.get('closing') or {}
 
     if document_type == 'room_reservation':
         for section in doc.sections:
@@ -615,10 +806,14 @@ def generate_document(template_path: str, content: dict, output_path: str):
             add_data_table(doc, ['DETAIL', 'PROVIDED INFORMATION'], details)
 
     # Add title if provided and not already in sections
-    has_title_section = bool(content.get('coverImage')) or any(s.get('type') == 'title' for s in sections)
+    has_title_section = bool(itinerary_cover) or (
+        bool(content.get('coverImage')) and document_type != 'tour_itinerary'
+    ) or any(s.get('type') == 'title' for s in sections)
     if title and not has_title_section and document_type != 'room_reservation':
         add_title_paragraph(doc, title)
-    if content.get('coverImage'):
+    if document_type == 'tour_itinerary' and itinerary_cover:
+        add_itinerary_cover(doc, content, itinerary_cover)
+    elif content.get('coverImage') and document_type != 'tour_itinerary':
         add_document_images(doc, [content['coverImage']])
     
     # Add each section
@@ -671,7 +866,7 @@ def generate_document(template_path: str, content: dict, output_path: str):
             # No extra space needed - heading bar already has built-in spacing
             pass
     
-    if document_type in (None, 'tour_itinerary', 'tour_proposal'):
+    if document_type in (None, 'tour_proposal'):
         end_para = doc.add_paragraph()
         end_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         end_para.paragraph_format.space_before = Pt(12)
@@ -680,21 +875,7 @@ def generate_document(template_path: str, content: dict, output_path: str):
         run.font.bold = True
         run.font.size = Pt(12)
     if document_type == 'tour_itinerary':
-        add_blue_heading_bar(doc, 'BEYOND ESCAPES PRIVATE LIMITED')
-        for line in [
-            '+94 112 579 679 | +94 112 579 779 | +94 76 900 2880',
-            'tours@beyondescapes.com | www.beyondescapes.com',
-            '164/B, New Kandy Rd, Kothalawala, Kaduwela, Sri Lanka',
-        ]:
-            paragraph = doc.add_paragraph()
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            paragraph.paragraph_format.space_before = Pt(4)
-            paragraph.paragraph_format.space_after = Pt(4)
-            run = paragraph.add_run(line)
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(10)
-        if content.get('closingLogo'):
-            add_document_images(doc, [content['closingLogo']])
+        add_itinerary_closing(doc, itinerary_closing)
     
     # Save document
     doc.save(output_path)

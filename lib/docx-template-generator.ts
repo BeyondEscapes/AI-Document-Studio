@@ -2,7 +2,7 @@ import fs from 'fs'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import JSZip from 'jszip'
 import { BUSINESS_DOCUMENT_TEMPLATES } from '@/lib/business-documents'
-import type { DocumentContent, DocumentSection } from '@/types'
+import type { DocumentContent, DocumentImage, DocumentSection, ItineraryClosingSettings, ItineraryCoverSettings } from '@/types'
 
 const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 const WORD_DRAWING_NS = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'
@@ -547,6 +547,147 @@ function sectionElements(document: XmlDocument, section: DocumentSection, brande
   }
 }
 
+function createTableCell(
+  document: XmlDocument,
+  width: number,
+  elements: XmlElement[],
+  fill?: string
+): XmlElement {
+  const cell = wordElement(document, 'tc')
+  const properties = wordElement(document, 'tcPr')
+  const cellWidth = wordElement(document, 'tcW')
+  setWordAttribute(cellWidth, 'w', width)
+  setWordAttribute(cellWidth, 'type', 'dxa')
+  properties.appendChild(cellWidth)
+  const margins = wordElement(document, 'tcMar')
+  for (const edge of ['top', 'left', 'bottom', 'right']) {
+    const margin = wordElement(document, edge)
+    setWordAttribute(margin, 'w', 90)
+    setWordAttribute(margin, 'type', 'dxa')
+    margins.appendChild(margin)
+  }
+  properties.appendChild(margins)
+  if (fill) {
+    const shading = wordElement(document, 'shd')
+    setWordAttribute(shading, 'val', 'clear')
+    setWordAttribute(shading, 'color', 'auto')
+    setWordAttribute(shading, 'fill', fill)
+    properties.appendChild(shading)
+  }
+  cell.appendChild(properties)
+  for (const element of elements) cell.appendChild(element)
+  return cell
+}
+
+function createItineraryCoverTable(
+  document: XmlDocument,
+  cover: ItineraryCoverSettings,
+  intakeFields: Record<string, string>,
+  mapImageElements: XmlElement[]
+): XmlElement {
+  const table = wordElement(document, 'tbl')
+  const properties = wordElement(document, 'tblPr')
+  const width = wordElement(document, 'tblW')
+  setWordAttribute(width, 'w', CONTENT_WIDTH)
+  setWordAttribute(width, 'type', 'dxa')
+  properties.appendChild(width)
+  const layout = wordElement(document, 'tblLayout')
+  setWordAttribute(layout, 'type', 'fixed')
+  properties.appendChild(layout)
+  const borders = wordElement(document, 'tblBorders')
+  for (const edge of ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']) {
+    const border = wordElement(document, edge)
+    setWordAttribute(border, 'val', 'nil')
+    borders.appendChild(border)
+  }
+  properties.appendChild(borders)
+  table.appendChild(properties)
+
+  const leftWidth = 3900
+  const rightWidth = CONTENT_WIDTH - leftWidth
+  const grid = wordElement(document, 'tblGrid')
+  for (const columnWidth of [leftWidth, rightWidth]) {
+    const column = wordElement(document, 'gridCol')
+    setWordAttribute(column, 'w', columnWidth)
+    grid.appendChild(column)
+  }
+  table.appendChild(grid)
+
+  const mapCellElements = [
+    createParagraph(document, 'SRI LANKA ROUTE MAP', { bold: true, color: BLUE, alignment: 'center', after: 80, size: 20 }),
+    ...mapImageElements,
+    createParagraph(document, cover.mapAttribution ?? 'Illustrative route map - not to scale', {
+      color: '66737E',
+      alignment: 'center',
+      before: 40,
+      size: 13,
+      font: 'Calibri',
+    }),
+  ]
+
+  const rightCellElements: XmlElement[] = [
+    createParagraph(document, 'YOUR JOURNEY AT A GLANCE', { bold: true, color: BLUE, size: 21, after: 70 }),
+    createParagraph(document, cover.overview ?? '', { size: 18, after: 110 }),
+    createParagraph(document, 'A WARM WELCOME', { bold: true, color: '668678', size: 19, after: 50 }),
+    createParagraph(document, cover.welcome ?? '', { size: 17, after: 100 }),
+  ]
+  const routeText = intakeFields.destinations?.trim()
+    || intakeFields.route?.trim()
+    || intakeFields.travelRoute?.trim()
+    || (cover.routeStops ?? []).map(stop => stop.name).join(' - ')
+  if (routeText) {
+    rightCellElements.push(
+      createParagraph(document, 'ROUTE PLAN', { bold: true, color: BLUE, size: 19, after: 40 }),
+      createParagraph(document, routeText, { bold: true, size: 17, after: 70 })
+    )
+  }
+  const tripDetails = [
+    intakeFields.tripDuration?.trim() ? `Trip duration: ${intakeFields.tripDuration.trim()}` : '',
+    intakeFields.travelDates?.trim() ? `Travel dates: ${intakeFields.travelDates.trim()}` : '',
+    cover.preparedBy?.trim() ? `Prepared by: ${cover.preparedBy.trim()}` : '',
+  ].filter(Boolean)
+  if (tripDetails.length) rightCellElements.push(createParagraph(document, tripDetails.join('\n'), { size: 16, after: 65 }))
+  const contacts = [
+    intakeFields.phone?.trim() ?? '+94 112 579 679',
+    intakeFields.email?.trim() ?? 'tours@beyondescapes.com',
+  ].filter(Boolean)
+  if (contacts.length) {
+    rightCellElements.push(createParagraph(document, contacts.join('\n'), { color: '35485B', size: 16, after: 30 }))
+  }
+
+  const row = wordElement(document, 'tr')
+  row.appendChild(createTableCell(document, leftWidth, mapCellElements, 'F4F8F5'))
+  row.appendChild(createTableCell(document, rightWidth, rightCellElements))
+  table.appendChild(row)
+  return table
+}
+
+function itineraryClosingElements(document: XmlDocument, closing: ItineraryClosingSettings): XmlElement[] {
+  const elements: XmlElement[] = [
+    createHeadingBar(document, 'CANCELLATION POLICY'),
+    ...(closing.cancellationPolicy ?? []).filter(item => item.trim()).map(item =>
+      createParagraph(document, `\u2022  ${item}`, { after: 100, size: 21 })
+    ),
+    createParagraph(document, '****END OF SERVICES****', {
+      bold: true,
+      before: 300,
+      after: 200,
+      alignment: 'center',
+      size: 22,
+    }),
+    createHeadingBar(document, closing.companyName ?? 'BEYOND ESCAPES PRIVATE LIMITED'),
+    ...[closing.phone, closing.email, closing.address]
+      .filter((line): line is string => Boolean(line?.trim()))
+      .map(line => createParagraph(document, line, {
+        alignment: 'center',
+        before: 80,
+        after: 80,
+        size: 20,
+      })),
+  ]
+  return elements
+}
+
 function decodeItineraryImage(source: string): Buffer {
   const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(source)
   if (!match || match[1].length > 12 * 1024 * 1024) {
@@ -761,14 +902,55 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
     if (child !== sectionProperties) body.removeChild(child)
   }
 
-  const hasTitleSection = Boolean(content.coverImage) || content.sections.some(section => section.type === 'title')
+  const itineraryCover = content.documentType === 'tour_itinerary' ? content.itineraryPages?.cover : undefined
+  const hasTitleSection = Boolean(content.coverImage || itineraryCover) || content.sections.some(section => section.type === 'title')
   const elements: XmlElement[] = []
   if (content.documentType === 'room_reservation') {
     elements.push(...roomReservationElements(document, content.intake?.fields ?? {}))
   } else if (content.title && !hasTitleSection) {
     elements.push(createParagraph(document, content.title, { bold: true, after: 160 }))
   }
-  if (content.coverImage) {
+  if (itineraryCover) {
+    const imageElements: XmlElement[] = []
+    if (itineraryCover.welcomeArtwork) {
+      await addItineraryImages(archive, document, [itineraryCover.welcomeArtwork], imageElements)
+    }
+    elements.push(
+      createParagraph(document, content.title || 'TOUR OF SRI LANKA', {
+        bold: true,
+        color: BLUE,
+        alignment: 'center',
+        before: 80,
+        after: 70,
+        size: 34,
+      }),
+      ...imageElements,
+      createParagraph(document, 'Ayubowan | Welcome to Sri Lanka', {
+        bold: true,
+        color: '668678',
+        alignment: 'center',
+        before: 30,
+        after: 70,
+        size: 22,
+      })
+    )
+    const mapElements: XmlElement[] = []
+    if (itineraryCover.mapImage) {
+      await addItineraryImages(archive, document, [itineraryCover.mapImage], mapElements)
+    }
+    const closingSettings = content.itineraryPages?.closing ?? {}
+    const coverFields = {
+      ...content.intake?.fields,
+      phone: closingSettings.phone ?? content.intake?.fields.phone ?? '',
+      email: closingSettings.email ?? content.intake?.fields.email ?? '',
+    }
+    elements.push(createItineraryCoverTable(
+      document,
+      itineraryCover,
+      coverFields,
+      mapElements
+    ))
+  } else if (content.coverImage && content.documentType !== 'tour_itinerary') {
     await addItineraryImages(archive, document, [content.coverImage], elements)
   }
   elements.push(...documentIntakeElements(document, content))
@@ -777,26 +959,15 @@ export async function generateBrandedDocx(content: DocumentContent, templatePath
     elements.push(...sectionElements(document, section, content.documentType === 'tour_itinerary'))
     await addItineraryImages(archive, document, section.images ?? [], elements)
   }
-  if (!content.documentType || content.documentType === 'tour_itinerary' || content.documentType === 'tour_proposal') {
-    elements.push(createParagraph(document, '****END OF SERVICES****', { bold: true, before: 240, alignment: 'center' }))
-  }
   if (content.documentType === 'tour_itinerary') {
-    elements.push(createHeadingBar(document, 'BEYOND ESCAPES PRIVATE LIMITED'))
-    for (const line of [
-      '+94 112 579 679 | +94 112 579 779 | +94 76 900 2880',
-      'tours@beyondescapes.com | www.beyondescapes.com',
-      '164/B, New Kandy Rd, Kothalawala, Kaduwela, Sri Lanka',
-    ]) {
-      elements.push(createParagraph(document, line, {
-        alignment: 'center',
-        before: 80,
-        after: 80,
-        size: 20,
-      }))
-    }
-    if (content.closingLogo) {
-      await addItineraryImages(archive, document, [content.closingLogo], elements)
-    }
+    elements.push(...itineraryClosingElements(
+      document,
+      content.itineraryPages?.closing ?? {}
+    ))
+    const closingLogo = content.itineraryPages?.closing?.logo ?? content.closingLogo
+    if (closingLogo) await addItineraryImages(archive, document, [closingLogo], elements)
+  } else if (!content.documentType || content.documentType === 'tour_proposal') {
+    elements.push(createParagraph(document, '****END OF SERVICES****', { bold: true, before: 240, alignment: 'center' }))
   }
 
   for (const element of elements) {
