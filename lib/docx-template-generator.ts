@@ -2,6 +2,14 @@ import fs from 'fs'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import JSZip from 'jszip'
 import { BUSINESS_DOCUMENT_TEMPLATES } from '@/lib/business-documents'
+import {
+  DEFAULT_QUOTATION,
+  DEFAULT_ENTRANCE_FEES,
+  DEFAULT_VALUE_ADDED_SERVICES,
+  DEFAULT_RATE_INCLUDES,
+  DEFAULT_RATE_EXCLUDES,
+  DEFAULT_CANCELLATION_POLICY,
+} from '@/lib/itinerary-page-content'
 import type { DocumentContent, DocumentImage, DocumentSection, ItineraryClosingSettings, ItineraryCoverSettings } from '@/types'
 
 const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -687,28 +695,130 @@ function itineraryCoverContactElements(
 }
 
 function itineraryClosingElements(document: XmlDocument, closing: ItineraryClosingSettings): XmlElement[] {
-  const elements: XmlElement[] = [
-    createHeadingBar(document, 'CANCELLATION POLICY'),
-    ...(closing.cancellationPolicy ?? []).filter(item => item.trim()).map(item =>
-      createParagraph(document, `\u2022  ${item}`, { after: 100, size: 21 })
-    ),
-    createParagraph(document, '****END OF SERVICES****', {
+  const elements: XmlElement[] = []
+
+  // 1. End of services marker
+  elements.push(createParagraph(document, '****END OF SERVICES****', {
+    bold: true,
+    before: 300,
+    after: 200,
+    alignment: 'center',
+    size: 22,
+  }))
+
+  // 2. Page break to start Closing / Quotation page
+  const pageBreakPara = wordElement(document, 'p')
+  const run = wordElement(document, 'r')
+  const pageBreak = wordElement(document, 'br')
+  setWordAttribute(pageBreak, 'type', 'page')
+  run.appendChild(pageBreak)
+  pageBreakPara.appendChild(run)
+  elements.push(pageBreakPara)
+
+  // 3. Quotation
+  elements.push(createParagraph(document, 'Quotation', {
+    bold: true,
+    before: 80,
+    after: 60,
+    size: 24,
+  }))
+
+  const quotationData = closing.quotation ?? DEFAULT_QUOTATION
+  const qItems = quotationData.items?.length ? quotationData.items : DEFAULT_QUOTATION.items
+  const qTotal = quotationData.total || DEFAULT_QUOTATION.total
+
+  const qRows = qItems.map(it => [it.service, it.amount])
+  if (qTotal) {
+    qRows.push(['Total', qTotal])
+  }
+  elements.push(createDataTable(document, {
+    id: 'closing-quotation-table',
+    type: 'table',
+    content: '',
+    headers: ['Services', 'Amount'],
+    rows: qRows,
+  }, 'F2F4F7', '111827'))
+
+  // 4. Optional Entrance Fees
+  const feeItems = closing.optionalEntranceFees?.length ? closing.optionalEntranceFees : DEFAULT_ENTRANCE_FEES
+  if (feeItems.length) {
+    elements.push(createParagraph(document, 'Optional - Entrance fees', {
       bold: true,
-      before: 300,
-      after: 200,
-      alignment: 'center',
+      before: 160,
+      after: 60,
       size: 22,
-    }),
-    createHeadingBar(document, closing.companyName ?? 'BEYOND ESCAPES PRIVATE LIMITED'),
-    ...[closing.phone, closing.email, closing.address]
-      .filter((line): line is string => Boolean(line?.trim()))
-      .map(line => createParagraph(document, line, {
-        alignment: 'center',
-        before: 80,
-        after: 80,
-        size: 20,
-      })),
+    }))
+    elements.push(createDataTable(document, {
+      id: 'closing-entrance-fees-table',
+      type: 'table',
+      content: '',
+      rows: feeItems.map(it => [it.attraction, it.amount]),
+    }))
+  }
+
+  // Helper for closing lists
+  const addListSection = (headingText: string, items: string[], isRed = false) => {
+    if (!items.length) return
+    elements.push(createParagraph(document, headingText, {
+      bold: true,
+      underline: true,
+      color: isRed ? 'DC2626' : '1B365D',
+      before: 160,
+      after: 40,
+      size: 21,
+    }))
+    for (const item of items) {
+      if (!item.trim()) continue
+      elements.push(createParagraph(document, `\u2022  ${item}`, {
+        color: isRed ? 'DC2626' : undefined,
+        after: 40,
+        size: 19,
+      }))
+    }
+  }
+
+  // 5. VALUE ADDED SERVICES
+  const vas = closing.valueAddedServices?.length ? closing.valueAddedServices : DEFAULT_VALUE_ADDED_SERVICES
+  addListSection('VALUE ADDED SERVICES ON COMPLEMENTARY BASIS', vas)
+
+  // 6. ABOVE RATE INCLUDES
+  const inc = closing.rateIncludes?.length ? closing.rateIncludes : DEFAULT_RATE_INCLUDES
+  addListSection('ABOVE RATE INCLUDES', inc)
+
+  // 7. THE ABOVE RATE EXCLUDES
+  const exc = closing.rateExcludes?.length ? closing.rateExcludes : DEFAULT_RATE_EXCLUDES
+  addListSection('THE ABOVE RATE EXCLUDES', exc)
+
+  // 8. CANCELLATION POLICY
+  const pol = closing.cancellationPolicy?.length ? closing.cancellationPolicy : DEFAULT_CANCELLATION_POLICY
+  addListSection('CANCELLATION POLICY', pol, true)
+
+  // 9. Company Details & Footer
+  elements.push(createParagraph(document, closing.companyName ?? 'BEYOND ESCAPES PRIVATE LIMITED', {
+    alignment: 'center',
+    bold: true,
+    color: '1B365D',
+    before: 240,
+    after: 40,
+    size: 21,
+  }))
+
+  const contactLines = [
+    closing.phone ?? '+94 112 579 679 | +94 112 579 779 | +94 70 457 9679',
+    closing.email ?? 'info@beyondescapes.com | www.beyondescapes.com',
+    'Skype: Beyond.Escapes',
+    closing.address ?? '164/B, New Kandy Rd, Kothalawala, Kaduwela, Sri Lanka',
   ]
+  for (const line of contactLines) {
+    if (!line?.trim()) continue
+    elements.push(createParagraph(document, line, {
+      alignment: 'center',
+      color: '4B5563',
+      after: 30,
+      size: 17,
+    }))
+  }
+
   return elements
 }
 

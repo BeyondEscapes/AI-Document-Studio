@@ -402,46 +402,267 @@ def add_itinerary_cover(doc, content, cover):
             address_run.font.color.rgb = RGBColor(53, 72, 91)
 
 
-def add_itinerary_closing(doc, closing):
-    add_blue_heading_bar(doc, 'CANCELLATION POLICY')
-    policy = closing.get('cancellationPolicy')
-    if policy is None:
-        policy = [
-            'Please refer to the cancellation terms provided for this itinerary. Any applicable fees and deadlines are subject to those agreed terms.'
-        ]
-    for item in policy:
-        if not str(item).strip():
-            continue
-        para = add_bullet_paragraph(doc, str(item))
-        for run in para.runs:
-            run.font.size = Pt(10)
-        para.paragraph_format.space_after = Pt(3)
+DEFAULT_QUOTATION_ITEMS = [
+    ('Per vehicle per tour', 'USD 760.00'),
+    ('Udawalawe Safari @USD 65.00 per person x 2', 'USD 130.00'),
+    ('Train Tickets @USD15.00 per person x 2', 'USD 30.00'),
+]
+DEFAULT_QUOTATION_TOTAL = 'USD 920.00'
 
+DEFAULT_ENTRANCE_FEES_ITEMS = [
+    ('Dambulla Cave Temple', 'USD 10.00'),
+    ('Sigiriya Rock Fortress', 'USD 35.00'),
+    ('Kandy Temple Of tooth', 'USD 10.00'),
+    ('Kandy Cultural Show', 'USD 5.00'),
+    ('Stilt Fishing', 'USD 5.00'),
+    ('Victoria Park', 'USD 5.00'),
+    ('Madu river boat safari', 'USD 15.00'),
+    ('Whale watching experience', 'USD 35.00'),
+    ('Village safari experience', 'USD 7.00'),
+]
+
+DEFAULT_VALUE_ADDED_ITEMS = [
+    'Paging and welcome with Garlands on arrival',
+    'Meeting and assistance at the airport on arrival',
+    '500ml Mineral Water Bottle per day per person will be given during sightseeing tours',
+]
+
+DEFAULT_RATE_INCLUDES_ITEMS = [
+    'Transport is based on Air-conditioned Luxury Car',
+    'Service of an English-speaking Chauffeur Guide.',
+    'Driver bata, driver accommodation, fuel, Parking and highway tickets',
+    'Half Day Safari at Udawalawe National Park',
+    '2nd Class Train tickets from Ella to Nanu Oya',
+    'All current taxes as on date',
+]
+
+DEFAULT_RATE_EXCLUDES_ITEMS = [
+    'Hotel accommodation',
+    'Breakfast, Lunch & Dinner',
+    'Entrance fees',
+    'Sri Lanka Visa',
+    'Compulsory new year supplement (USD 50.00 Per Person)',
+    'Any International Airfare / Airport taxes',
+    'Any change in tax structure resulting from the hike in published tariff.',
+    'Items of personal nature like tips, laundry, phone calls etc.',
+    'Any video / still camera fee to the monuments and places of visit',
+    'Any other item not explicitly mentioned under price includes.',
+    'Bar, telephone and laundry bills',
+    'Tips to guides, restaurants, and hotel lobby. Tipping is expected.',
+    'Any others expense',
+]
+
+DEFAULT_CANCELLATION_POLICY_ITEMS = [
+    '30 Days prior to the scheduled starting date: No Cancellation Fee',
+    '29-15 Days prior to the scheduled starting date: 50% Cancellation Fee',
+    '14 Days prior to the scheduled starting date: 75% Cancellation Fee',
+    'Within 07 prior to the scheduled starting date: 100% Cancellation Fee',
+    'Fee. No Shows - 100% Cancellation Fee.',
+]
+
+
+def add_itinerary_closing(doc, closing, content=None):
+    # 1. End of services marker
     end_para = doc.add_paragraph()
     end_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     end_para.paragraph_format.space_before = Pt(16)
-    end_para.paragraph_format.space_after = Pt(10)
+    end_para.paragraph_format.space_after = Pt(14)
     end_run = end_para.add_run('****END OF SERVICES****')
     end_run.font.name = 'Times New Roman'
     end_run.font.bold = True
     end_run.font.size = Pt(11)
 
-    add_blue_heading_bar(doc, closing.get('companyName') or 'BEYOND ESCAPES PRIVATE LIMITED')
-    for line in (closing.get('phone'), closing.get('email'), closing.get('address')):
-        if not isinstance(line, str) or not line.strip():
+    # 2. Page break to separate Closing onto dedicated pages
+    doc.add_page_break()
+
+    # 3. Quotation section
+    quotation_data = closing.get('quotation') or {}
+    raw_items = quotation_data.get('items') or []
+    if raw_items:
+        items = [
+            (it.get('service', ''), it.get('amount', '')) if isinstance(it, dict) else (it[0], it[1])
+            for it in raw_items
+        ]
+    else:
+        items = DEFAULT_QUOTATION_ITEMS
+    total = quotation_data.get('total') or DEFAULT_QUOTATION_TOTAL
+
+    q_title = doc.add_paragraph()
+    q_title.paragraph_format.space_before = Pt(4)
+    q_title.paragraph_format.space_after = Pt(4)
+    q_title_run = q_title.add_run('Quotation')
+    q_title_run.font.name = 'Times New Roman'
+    q_title_run.font.bold = True
+    q_title_run.font.size = Pt(12)
+
+    total_rows = len(items) + (2 if total else 1)
+    q_table = doc.add_table(rows=total_rows, cols=2)
+    q_table.style = 'Table Grid'
+
+    # Header
+    hdr = q_table.rows[0]
+    hdr.cells[0].paragraphs[0].paragraph_format.space_before = Pt(2)
+    hdr.cells[0].paragraphs[0].paragraph_format.space_after = Pt(2)
+    hdr_run0 = hdr.cells[0].paragraphs[0].add_run('Services')
+    hdr_run0.font.name = 'Times New Roman'
+    hdr_run0.font.bold = True
+    hdr_run0.font.size = Pt(10)
+
+    hdr.cells[1].paragraphs[0].paragraph_format.space_before = Pt(2)
+    hdr.cells[1].paragraphs[0].paragraph_format.space_after = Pt(2)
+    hdr_run1 = hdr.cells[1].paragraphs[0].add_run('Amount')
+    hdr_run1.font.name = 'Times New Roman'
+    hdr_run1.font.bold = True
+    hdr_run1.font.size = Pt(10)
+
+    for idx, (serv, amt) in enumerate(items):
+        row = q_table.rows[idx + 1]
+        row.cells[0].paragraphs[0].paragraph_format.space_before = Pt(2)
+        row.cells[0].paragraphs[0].paragraph_format.space_after = Pt(2)
+        r0 = row.cells[0].paragraphs[0].add_run(serv)
+        r0.font.name = 'Times New Roman'
+        r0.font.size = Pt(9.5)
+
+        row.cells[1].paragraphs[0].paragraph_format.space_before = Pt(2)
+        row.cells[1].paragraphs[0].paragraph_format.space_after = Pt(2)
+        r1 = row.cells[1].paragraphs[0].add_run(amt)
+        r1.font.name = 'Times New Roman'
+        r1.font.size = Pt(9.5)
+
+    if total:
+        t_row = q_table.rows[-1]
+        t_row.cells[0].paragraphs[0].paragraph_format.space_before = Pt(3)
+        t_row.cells[0].paragraphs[0].paragraph_format.space_after = Pt(3)
+        tr0 = t_row.cells[0].paragraphs[0].add_run('Total')
+        tr0.font.name = 'Times New Roman'
+        tr0.font.bold = True
+        tr0.font.size = Pt(10)
+
+        t_row.cells[1].paragraphs[0].paragraph_format.space_before = Pt(3)
+        t_row.cells[1].paragraphs[0].paragraph_format.space_after = Pt(3)
+        tr1 = t_row.cells[1].paragraphs[0].add_run(total)
+        tr1.font.name = 'Times New Roman'
+        tr1.font.bold = True
+        tr1.font.size = Pt(10)
+
+    for row in q_table.rows:
+        row.cells[0].width = Inches(4.7)
+        row.cells[1].width = Inches(1.8)
+
+    # 4. Optional - Entrance fees
+    fees_raw = closing.get('optionalEntranceFees') or []
+    if fees_raw:
+        fee_items = [
+            (it.get('attraction', ''), it.get('amount', '')) if isinstance(it, dict) else (it[0], it[1])
+            for it in fees_raw
+        ]
+    else:
+        fee_items = DEFAULT_ENTRANCE_FEES_ITEMS
+
+    if fee_items:
+        f_title = doc.add_paragraph()
+        f_title.paragraph_format.space_before = Pt(10)
+        f_title.paragraph_format.space_after = Pt(3)
+        f_title_run = f_title.add_run('Optional - Entrance fees')
+        f_title_run.font.name = 'Times New Roman'
+        f_title_run.font.bold = True
+        f_title_run.font.size = Pt(11)
+
+        f_table = doc.add_table(rows=len(fee_items), cols=2)
+        f_table.style = 'Table Grid'
+        for idx, (attr, amt) in enumerate(fee_items):
+            row = f_table.rows[idx]
+            row.cells[0].paragraphs[0].paragraph_format.space_before = Pt(1.5)
+            row.cells[0].paragraphs[0].paragraph_format.space_after = Pt(1.5)
+            r0 = row.cells[0].paragraphs[0].add_run(attr)
+            r0.font.name = 'Times New Roman'
+            r0.font.size = Pt(9)
+
+            row.cells[1].paragraphs[0].paragraph_format.space_before = Pt(1.5)
+            row.cells[1].paragraphs[0].paragraph_format.space_after = Pt(1.5)
+            r1 = row.cells[1].paragraphs[0].add_run(amt)
+            r1.font.name = 'Times New Roman'
+            r1.font.size = Pt(9)
+
+        for row in f_table.rows:
+            row.cells[0].width = Inches(4.7)
+            row.cells[1].width = Inches(1.8)
+
+    # Helper for list sections
+    def add_closing_list(title_text, items_list, color_rgb=(0x1B, 0x36, 0x5D), is_red_bullet=False):
+        if not items_list:
+            return
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(10)
+        p.paragraph_format.space_after = Pt(3)
+        r = p.add_run(title_text)
+        r.font.name = 'Times New Roman'
+        r.font.bold = True
+        r.font.underline = True
+        r.font.size = Pt(10.5)
+        r.font.color.rgb = RGBColor(*color_rgb)
+
+        for item in items_list:
+            if not str(item).strip():
+                continue
+            para = add_bullet_paragraph(doc, str(item))
+            for run in para.runs:
+                run.font.name = 'Times New Roman'
+                run.font.size = Pt(9.5)
+                if is_red_bullet:
+                    run.font.color.rgb = RGBColor(220, 38, 38)
+            para.paragraph_format.space_after = Pt(2)
+
+    # 5. VALUE ADDED SERVICES ON COMPLEMENTARY BASIS
+    vas = closing.get('valueAddedServices') or DEFAULT_VALUE_ADDED_ITEMS
+    add_closing_list('VALUE ADDED SERVICES ON COMPLEMENTARY BASIS', vas, (0x1B, 0x36, 0x5D), is_red_bullet=False)
+
+    # 6. ABOVE RATE INCLUDES
+    inc = closing.get('rateIncludes') or DEFAULT_RATE_INCLUDES_ITEMS
+    add_closing_list('ABOVE RATE INCLUDES', inc, (0x1B, 0x36, 0x5D), is_red_bullet=False)
+
+    # 7. THE ABOVE RATE EXCLUDES
+    exc = closing.get('rateExcludes') or DEFAULT_RATE_EXCLUDES_ITEMS
+    add_closing_list('THE ABOVE RATE EXCLUDES', exc, (0x1B, 0x36, 0x5D), is_red_bullet=False)
+
+    # 8. CANCELLATION POLICY
+    pol = closing.get('cancellationPolicy') or DEFAULT_CANCELLATION_POLICY_ITEMS
+    add_closing_list('CANCELLATION POLICY', pol, (220, 38, 38), is_red_bullet=True)
+
+    # 9. Company Details & Footer
+    c_para = doc.add_paragraph()
+    c_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    c_para.paragraph_format.space_before = Pt(16)
+    c_para.paragraph_format.space_after = Pt(2)
+    c_run = c_para.add_run(closing.get('companyName') or 'BEYOND ESCAPES PRIVATE LIMITED')
+    c_run.font.name = 'Times New Roman'
+    c_run.font.bold = True
+    c_run.font.size = Pt(10.5)
+    c_run.font.color.rgb = RGBColor(0x1B, 0x36, 0x5D)
+
+    contact_lines = [
+        closing.get('phone') or '+94 112 579 679 | +94 112 579 779 | +94 70 457 9679',
+        closing.get('email') or 'info@beyondescapes.com | www.beyondescapes.com',
+        'Skype: Beyond.Escapes',
+        closing.get('address') or '164/B, New Kandy Rd, Kothalawala, Kaduwela, Sri Lanka',
+    ]
+    for line in contact_lines:
+        if not line:
             continue
-        paragraph = doc.add_paragraph()
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        paragraph.paragraph_format.space_before = Pt(3)
-        paragraph.paragraph_format.space_after = Pt(3)
-        run = paragraph.add_run(line)
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(9)
-    logo = closing.get('logo') or content.get('closingLogo')
+        lp = doc.add_paragraph()
+        lp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        lp.paragraph_format.space_before = Pt(0)
+        lp.paragraph_format.space_after = Pt(1)
+        lr = lp.add_run(line)
+        lr.font.name = 'Times New Roman'
+        lr.font.size = Pt(8.5)
+        lr.font.color.rgb = RGBColor(80, 80, 80)
+
+    logo = closing.get('logo') or (content.get('closingLogo') if content else None)
     if logo:
         paragraph = doc.add_paragraph()
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        paragraph.paragraph_format.space_before = Pt(6)
+        paragraph.paragraph_format.space_before = Pt(8)
         paragraph.paragraph_format.space_after = Pt(0)
         add_image_to_paragraph(paragraph, logo, max_width=3.6, max_height=0.75)
 
@@ -893,7 +1114,7 @@ def generate_document(template_path: str, content: dict, output_path: str):
         run.font.bold = True
         run.font.size = Pt(12)
     if document_type == 'tour_itinerary':
-        add_itinerary_closing(doc, itinerary_closing)
+        add_itinerary_closing(doc, itinerary_closing, content)
     
     # Save document
     doc.save(output_path)

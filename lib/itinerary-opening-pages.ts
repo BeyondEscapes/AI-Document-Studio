@@ -98,6 +98,11 @@ export async function addItineraryOpeningPages(content: DocumentContent): Promis
   }
   const closing: ItineraryClosingSettings = {
     ...currentClosing,
+    quotation: pageContent.quotation,
+    optionalEntranceFees: pageContent.optionalEntranceFees,
+    valueAddedServices: pageContent.valueAddedServices,
+    rateIncludes: pageContent.rateIncludes,
+    rateExcludes: pageContent.rateExcludes,
     cancellationPolicy: pageContent.cancellationPolicy,
     companyName: pageContent.companyName,
     phone: pageContent.phone,

@@ -1017,32 +1017,170 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
         <div className="space-y-1 doc-preview">
           {itinerarySections.map(section => <SectionPreview key={section.id} section={section} />)}
         </div>
+        <p className="my-8 text-center font-serif text-sm font-bold tracking-wider text-gray-900">
+          ****END OF SERVICES****
+        </p>
       </article>
 
-      <article className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm doc-preview">
-        <Image
-          src="/images/beyond_escapes_logo.png"
-          alt="Beyond Escapes"
-          width={220}
-          height={36}
-          className="mx-auto mb-4 h-9 w-auto object-contain"
-        />
-        <div className="rounded-sm bg-[#3973B9] px-3 py-1.5 text-center font-sans text-xs font-bold text-white">
-          CANCELLATION POLICY
+      {/* Closing Document Pages: Quotation, Optional Entrance Fees, Inclusions, Exclusions, Cancellation Policy */}
+      <article className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm doc-preview space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+          <Image
+            src="/images/beyond_escapes_logo.png"
+            alt="Beyond Escapes"
+            width={220}
+            height={36}
+            className="h-8 w-auto object-contain object-left"
+          />
+          <Image
+            src="/images/beyond_escapes_icon.png"
+            alt="Beyond Escapes Icon"
+            width={36}
+            height={36}
+            className="h-8 w-8 object-contain"
+          />
         </div>
-        <ul className="my-4 space-y-2 text-xs text-gray-700">
-          {pageContent.cancellationPolicy.map((item, index) => <li key={index}>• {item}</li>)}
-        </ul>
-        <p className="my-6 text-center text-xs font-bold">****END OF SERVICES****</p>
-        <div className="rounded-sm bg-[#3973B9] px-3 py-1.5 text-center font-sans text-xs font-bold text-white">
-          {pageContent.companyName}
+
+        {/* Quotation */}
+        <div>
+          <h2 className="mb-2 font-serif text-sm font-bold text-gray-900">Quotation</h2>
+          <div className="overflow-hidden rounded border border-black text-xs font-sans">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-black">
+                  <th className="border-r border-black px-3 py-1.5 text-left font-bold text-gray-900">Services</th>
+                  <th className="px-3 py-1.5 text-left font-bold text-gray-900 w-44">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/40 text-gray-800">
+                {pageContent.quotation.items.map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="border-r border-black/40 px-3 py-1.5">{item.service}</td>
+                    <td className="px-3 py-1.5 font-medium">{item.amount}</td>
+                  </tr>
+                ))}
+                {pageContent.quotation.total && (
+                  <tr className="border-t-2 border-black font-bold text-gray-900">
+                    <td className="border-r border-black px-3 py-1.5">Total</td>
+                    <td className="px-3 py-1.5">{pageContent.quotation.total}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="mt-2 space-y-1 text-center text-[10px] text-gray-600">
-          <p>{pageContent.phone}</p>
-          <p>{pageContent.email}</p>
-          <p>{pageContent.address}</p>
+
+        {/* Optional - Entrance fees */}
+        {pageContent.optionalEntranceFees.length > 0 && (
+          <div>
+            <h2 className="mb-2 font-serif text-sm font-bold text-gray-900">Optional - Entrance fees</h2>
+            <div className="overflow-hidden rounded border border-black text-xs font-sans">
+              <table className="w-full border-collapse">
+                <tbody className="divide-y divide-black/30 text-gray-800">
+                  {pageContent.optionalEntranceFees.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="border-r border-black/30 px-3 py-1.5">{item.attraction}</td>
+                      <td className="px-3 py-1.5 font-medium w-44">{item.amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* VALUE ADDED SERVICES ON COMPLEMENTARY BASIS */}
+        {pageContent.valueAddedServices.length > 0 && (
+          <div>
+            <h2 className="mb-2 font-sans text-xs font-bold uppercase tracking-wide text-[#1B365D] underline">
+              VALUE ADDED SERVICES ON COMPLEMENTARY BASIS
+            </h2>
+            <ul className="space-y-1.5 text-xs text-gray-800 list-disc list-inside">
+              {pageContent.valueAddedServices.map((item, idx) => (
+                <li key={idx} className="marker:text-red-500">{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ABOVE RATE INCLUDES */}
+        {pageContent.rateIncludes.length > 0 && (
+          <div>
+            <h2 className="mb-2 font-sans text-xs font-bold uppercase tracking-wide text-[#1B365D] underline">
+              ABOVE RATE INCLUDES
+            </h2>
+            <ul className="space-y-1.5 text-xs text-gray-800 list-disc list-inside">
+              {pageContent.rateIncludes.map((item, idx) => (
+                <li key={idx} className="marker:text-[#1B365D]">{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* THE ABOVE RATE EXCLUDES */}
+        {pageContent.rateExcludes.length > 0 && (
+          <div>
+            <h2 className="mb-2 font-sans text-xs font-bold uppercase tracking-wide text-[#1B365D] underline">
+              THE ABOVE RATE EXCLUDES
+            </h2>
+            <ul className="space-y-1.5 text-xs text-gray-800 list-disc list-inside">
+              {pageContent.rateExcludes.map((item, idx) => {
+                const isHighlight = item.toLowerCase().includes('compulsory');
+                return (
+                  <li key={idx} className="marker:text-[#1B365D]">
+                    {isHighlight ? (
+                      <span className="bg-yellow-200 px-1 py-0.5 rounded font-medium">{item}</span>
+                    ) : item}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {/* CANCELLATION POLICY */}
+        {pageContent.cancellationPolicy.length > 0 && (
+          <div>
+            <h2 className="mb-2 font-sans text-xs font-bold uppercase tracking-wide text-red-600 underline">
+              CANCELLATION POLICY
+            </h2>
+            <ul className="space-y-1.5 text-xs text-red-600 list-disc list-inside font-medium">
+              {pageContent.cancellationPolicy.map((item, idx) => (
+                <li key={idx} className="marker:text-red-600">{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Company Details & Footer */}
+        <div className="pt-6 border-t border-gray-200 text-center space-y-1">
+          <p className="font-serif text-xs font-bold text-[#1B365D] tracking-wide">{pageContent.companyName}</p>
+          <p className="text-[10px] text-gray-700">{pageContent.phone}</p>
+          <p className="text-[10px] text-gray-700">{pageContent.email}</p>
+          <p className="text-[10px] text-gray-700">Skype: Beyond.Escapes</p>
+          <p className="text-[10px] text-gray-600">{pageContent.address}</p>
+          <div className="mt-4 flex items-center justify-center gap-2 pt-2">
+            <Image
+              src="/images/beyond_escapes_logo.png"
+              alt="Beyond Escapes"
+              width={160}
+              height={26}
+              className="h-6 w-auto object-contain"
+            />
+            <Image
+              src="/images/beyond_escapes_icon.png"
+              alt="Beyond Escapes Icon"
+              width={26}
+              height={26}
+              className="h-6 w-6 object-contain"
+            />
+          </div>
         </div>
-        <p className="mt-3 text-center font-sans text-[8px] text-gray-400">Final page | Editable cancellation and contact details</p>
+
+        <p className="mt-3 text-center font-sans text-[8px] text-gray-400">
+          Closing pages | Quotation, Optional entrance fees, Inclusions, Exclusions &amp; Cancellation Policy
+        </p>
       </article>
     </div>
   )
@@ -1466,8 +1604,103 @@ function ItineraryPagesEditor({
         )}
       </div>
 
-      <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
-        <h4 className="text-[11px] font-semibold text-gray-800">Last page</h4>
+      <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-3">
+        <h4 className="text-[11px] font-semibold text-gray-800">Quotation &amp; Closing Page</h4>
+
+        {/* Quotation Editor */}
+        <div className="space-y-2 rounded border border-gray-100 bg-gray-50/50 p-2">
+          <span className="block text-[10px] font-semibold text-gray-700">Quotation (one per line: Service | Amount)</span>
+          <textarea
+            value={pageContent.quotation.items.map(it => `${it.service} | ${it.amount}`).join('\n')}
+            onChange={event => {
+              const items = event.target.value.split(/\r?\n/).map(line => {
+                const parts = line.split(/[|\t]/)
+                return { service: parts[0]?.trim() || '', amount: parts[1]?.trim() || '' }
+              }).filter(it => it.service || it.amount)
+              onClosingPageUpdate({
+                quotation: {
+                  items,
+                  total: closing.quotation?.total ?? pageContent.quotation.total,
+                },
+              })
+            }}
+            rows={3}
+            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            placeholder="Per vehicle per tour | USD 760.00"
+          />
+          <label className="block">
+            <span className="mb-0.5 block text-[9px] font-medium text-gray-600">Total Amount</span>
+            <input
+              value={closing.quotation?.total ?? pageContent.quotation.total}
+              onChange={event => onClosingPageUpdate({
+                quotation: {
+                  items: closing.quotation?.items ?? pageContent.quotation.items,
+                  total: event.target.value,
+                },
+              })}
+              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-800 outline-none focus:border-blue-400"
+              placeholder="USD 920.00"
+            />
+          </label>
+        </div>
+
+        {/* Optional Entrance Fees */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">Optional - Entrance fees (one per line: Attraction | Amount)</span>
+          <textarea
+            value={pageContent.optionalEntranceFees.map(it => `${it.attraction} | ${it.amount}`).join('\n')}
+            onChange={event => onClosingPageUpdate({
+              optionalEntranceFees: event.target.value.split(/\r?\n/).map(line => {
+                const parts = line.split(/[|\t]/)
+                return { attraction: parts[0]?.trim() || '', amount: parts[1]?.trim() || '' }
+              }).filter(it => it.attraction || it.amount),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            placeholder="Dambulla Cave Temple | USD 10.00"
+          />
+        </label>
+
+        {/* Value Added Services */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">Value added services on complementary basis (one item per line)</span>
+          <textarea
+            value={pageContent.valueAddedServices.join('\n')}
+            onChange={event => onClosingPageUpdate({
+              valueAddedServices: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={3}
+            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+          />
+        </label>
+
+        {/* Above Rate Includes */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">Above rate includes (one item per line)</span>
+          <textarea
+            value={pageContent.rateIncludes.join('\n')}
+            onChange={event => onClosingPageUpdate({
+              rateIncludes: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+          />
+        </label>
+
+        {/* The Above Rate Excludes */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-gray-600">The above rate excludes (one item per line)</span>
+          <textarea
+            value={pageContent.rateExcludes.join('\n')}
+            onChange={event => onClosingPageUpdate({
+              rateExcludes: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+          />
+        </label>
+
+        {/* Cancellation Policy */}
         <label className="block">
           <span className="mb-1 block text-[10px] font-medium text-gray-600">Cancellation policy (one term per line)</span>
           <textarea
@@ -1479,6 +1712,8 @@ function ItineraryPagesEditor({
             className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
           />
         </label>
+
+        {/* Company Contact Details */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {([
             ['companyName', 'Company name', pageContent.companyName],

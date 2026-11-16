@@ -37,7 +37,25 @@ export interface ItineraryCoverSettings {
   welcomeArtwork?: DocumentImage
 }
 
+export interface ItineraryQuotationItem {
+  service: string
+  amount: string
+}
+
+export interface ItineraryEntranceFeeItem {
+  attraction: string
+  amount: string
+}
+
 export interface ItineraryClosingSettings {
+  quotation?: {
+    items: ItineraryQuotationItem[]
+    total?: string
+  }
+  optionalEntranceFees?: ItineraryEntranceFeeItem[]
+  valueAddedServices?: string[]
+  rateIncludes?: string[]
+  rateExcludes?: string[]
   cancellationPolicy?: string[]
   companyName?: string
   phone?: string
