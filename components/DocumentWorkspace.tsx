@@ -9,7 +9,13 @@ import {
   ImagePlus, Search, Upload,
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel, getMissingRequiredFields } from '@/lib/business-documents'
-import { scoreItineraryImage, suggestItineraryImageMatches } from '@/lib/itinerary-images'
+import {
+  isItineraryDocument,
+  prepareDocumentForLocalSave,
+  scoreItineraryImage,
+  suggestItineraryPageImages,
+  suggestItineraryImageMatches,
+} from '@/lib/itinerary-images'
 import { getInitialRouteStops } from '@/lib/itinerary-route'
 import { extractItinerarySections, getItineraryPageContent } from '@/lib/itinerary-page-content'
 import ItineraryMapEditor from '@/components/ItineraryMapEditor'
@@ -32,6 +38,7 @@ interface DocumentWorkspaceProps {
   onDocumentUpdate: (content: DocumentContent) => void
   onSaveDocument: () => Promise<void>
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
+  saveError?: string | null
   onClose: () => void
 }
 
@@ -39,17 +46,6 @@ type ViewMode = 'preview' | 'edit'
 
 function resetApproval(content: DocumentContent): DocumentContent {
   return { ...content, approval: { status: 'draft' } }
-}
-
-function readBlobAsDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => typeof reader.result === 'string'
-      ? resolve(reader.result)
-      : reject(new Error('Could not read the selected image.'))
-    reader.onerror = () => reject(new Error('Could not read the selected image.'))
-    reader.readAsDataURL(blob)
-  })
 }
 
 function hasCurrentItineraryMap(content: DocumentContent): boolean {
@@ -64,10 +60,10 @@ function hasCurrentItineraryMap(content: DocumentContent): boolean {
 
 export function DocumentWorkspace({
   documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate,
-  onSaveDocument, saveStatus, onClose
+  onSaveDocument, saveStatus, saveError, onClose
 }: DocumentWorkspaceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [manualSaveError, setManualSaveError] = useState<string | null>(null)
   const [imageCatalog, setImageCatalog] = useState<ItineraryImageCatalogItem[]>([])
   const [imagePickerSectionId, setImagePickerSectionId] = useState<string | null>(null)
   const [imageSearch, setImageSearch] = useState('')
@@ -87,7 +83,7 @@ export function DocumentWorkspace({
   }>({ docx: 'idle', pdf: 'idle' })
 
   useEffect(() => {
-    if (documentContent?.documentType !== 'tour_itinerary') {
+    if (!isItineraryDocument(documentContent)) {
       setImageCatalog([])
       setImageStatus(null)
       setImageError(null)
@@ -111,11 +107,11 @@ export function DocumentWorkspace({
       })
 
     return () => { active = false }
-  }, [documentContent?.documentType])
+  }, [documentContent?.documentType, documentContent?.title, documentContent?.itineraryPages])
 
   const handleExport = async (format: 'docx' | 'pdf') => {
     if (!documentContent) return
-    if (documentContent.documentType === 'tour_itinerary' && !hasCurrentItineraryMap(documentContent)) {
+    if (isItineraryDocument(documentContent) && !hasCurrentItineraryMap(documentContent)) {
       setViewMode('edit')
       setExportStatus(prev => ({
         ...prev,
@@ -136,7 +132,7 @@ export function DocumentWorkspace({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          documentContent,
+          documentContent: prepareDocumentForLocalSave(documentContent),
           themeId: selectedThemeId,
           format,
         }),
@@ -167,7 +163,24 @@ export function DocumentWorkspace({
         return
       }
 
-      const data = await res.json()
+      const responseText = await res.text()
+      let data:
+        | { success: true; filename: string; downloadUrl: string }
+        | {
+            success?: false
+            error?: string
+            docxAvailable?: boolean
+            docxFilename?: string
+            docxDownloadUrl?: string
+          }
+      try {
+        data = JSON.parse(responseText)
+      } catch {
+        if (res.status === 413) {
+          throw new Error('This document is too large to export. Remove oversized embedded cover images and retry.')
+        }
+        throw new Error(`Export failed (HTTP ${res.status}).`)
+      }
 
       if (data.success) {
         setExportStatus(prev => ({
@@ -194,7 +207,7 @@ export function DocumentWorkspace({
           } : {}),
         }))
         // If PDF failed but DOCX was generated, offer it
-        if (data.docxAvailable && data.docxDownloadUrl) {
+        if (data.docxAvailable && data.docxDownloadUrl && data.docxFilename) {
           const link = document.createElement('a')
           link.href = data.docxDownloadUrl
           link.download = data.docxFilename
@@ -207,7 +220,7 @@ export function DocumentWorkspace({
       setExportStatus(prev => ({
         ...prev,
         [format]: 'error',
-        [`${format}Error`]: 'Network error. Please try again.',
+        [`${format}Error`]: err instanceof Error ? err.message : 'Export failed.',
       }))
     }
   }
@@ -259,7 +272,7 @@ export function DocumentWorkspace({
     }
     intake.missingFields = getMissingRequiredFields(intake)
     let updated: DocumentContent = { ...documentContent, intake }
-    if (documentContent.documentType === 'tour_itinerary' && ['destinations', 'route', 'travelRoute'].includes(key)) {
+    if (isItineraryDocument(documentContent) && ['destinations', 'route', 'travelRoute'].includes(key)) {
       const routeText = intake.fields.destinations || intake.fields.route || intake.fields.travelRoute || ''
       updated = {
         ...updated,
@@ -333,24 +346,16 @@ export function DocumentWorkspace({
   const handlePickLibraryImage = async (item: ItineraryImageCatalogItem) => {
     if (!imagePickerSectionId) return
     setImageError(null)
-    try {
-      const response = await fetch(item.url)
-      if (!response.ok) throw new Error(`Could not load ${item.title}.`)
-      const blob = await response.blob()
-      const src = await readBlobAsDataUrl(blob)
-      addImageToSection(imagePickerSectionId, {
-        catalogId: item.id,
-        src,
-        altText: item.title,
-        caption: item.title,
-        width: item.width,
-        height: item.height,
-      })
-      setImagePickerSectionId(null)
-      setImageSearch('')
-    } catch (error) {
-      setImageError(error instanceof Error ? error.message : 'Could not add that image.')
-    }
+    addImageToSection(imagePickerSectionId, {
+      catalogId: item.id,
+      src: item.url,
+      altText: item.title,
+      caption: item.title,
+      width: item.width,
+      height: item.height,
+    })
+    setImagePickerSectionId(null)
+    setImageSearch('')
   }
 
   const handleUploadImage = async (sectionId: string, file: File) => {
@@ -364,13 +369,10 @@ export function DocumentWorkspace({
       if (!response.ok) throw new Error(result.error || 'Image upload failed.')
 
       const item = result.image as ItineraryImageCatalogItem
-      const imageResponse = await fetch(item.url)
-      if (!imageResponse.ok) throw new Error(`Uploaded ${item.title}, but could not read it back.`)
-      const src = await readBlobAsDataUrl(await imageResponse.blob())
       setImageCatalog(current => [item, ...current.filter(image => image.id !== item.id)])
       addImageToSection(sectionId, {
         catalogId: item.id,
-        src,
+        src: item.url,
         altText: item.title,
         caption: item.title,
         width: item.width,
@@ -409,19 +411,16 @@ export function DocumentWorkspace({
 
     setIsMatchingImages(true)
     try {
-      const resolved = await Promise.all([...matches].map(async ([sectionId, item]) => {
-        const response = await fetch(item.url)
-        if (!response.ok) throw new Error(`Could not load the matched image “${item.title}”.`)
-        const src = await readBlobAsDataUrl(await response.blob())
-        return [sectionId, {
+      const resolved = [...matches].map(([sectionId, item]) => [
+        sectionId, {
           catalogId: item.id,
-          src,
+          src: item.url,
           altText: item.title,
           caption: item.title,
           width: item.width,
           height: item.height,
-        } satisfies DocumentImage] as const
-      }))
+        } satisfies DocumentImage,
+      ] as const)
       const imagesBySection = new Map(resolved)
       onDocumentUpdate(resetApproval({
         ...documentContent,
@@ -438,12 +437,100 @@ export function DocumentWorkspace({
     }
   }, [documentContent, imageCatalog, onDocumentUpdate])
 
+  const isItinerary = isItineraryDocument(documentContent)
+
+  const bodySections = isItinerary && documentContent
+    ? extractItinerarySections(documentContent.sections).remaining
+    : (documentContent?.sections ?? [])
+
+  const bodySectionIds = new Set(bodySections.map(s => s.id))
+
+  const totalBodyPhotos = bodySections.reduce(
+    (count, section) => count + (section.images?.length ?? 0),
+    0
+  )
+  const hasBodyPhotos = totalBodyPhotos > 0
+
+  const handleAddPhotosToAllPages = useCallback((replaceExisting = false) => {
+    if (!documentContent) return
+    setImageError(null)
+    setImageStatus(null)
+    if (!imageCatalog.length) {
+      setImageError('No destination photos are available. Add photos to the image library and try again.')
+      return
+    }
+
+    const assignments = suggestItineraryPageImages(documentContent.sections, imageCatalog, { replaceExisting })
+    if (!assignments.size) {
+      setImageStatus('All itinerary pages already have photos. Front cover and last page are unchanged.')
+      return
+    }
+
+    onDocumentUpdate(resetApproval({
+      ...documentContent,
+      sections: documentContent.sections.map(section => {
+        // Front and back pages must never be modified
+        if (!bodySectionIds.has(section.id)) return section
+        const item = assignments.get(section.id)
+        if (!item) {
+          return replaceExisting ? { ...section, images: [] } : section
+        }
+        const image: DocumentImage = {
+          catalogId: item.id,
+          src: item.url,
+          altText: item.title,
+          caption: item.title,
+          width: item.width,
+          height: item.height,
+        }
+        return {
+          ...section,
+          images: replaceExisting ? [image] : [...(section.images ?? []), image],
+        }
+      }),
+    }))
+    setImageStatus(`Added photos to ${assignments.size} itinerary day${assignments.size === 1 ? '' : 's'} in 1 click. Front and last pages are unchanged.`)
+  }, [documentContent, imageCatalog, bodySectionIds, onDocumentUpdate])
+
+  const handleRemoveAllPhotos = useCallback(() => {
+    if (!documentContent) return
+    setImageError(null)
+    setImageStatus(null)
+    const photoCount = bodySections.reduce(
+      (count, section) => count + (section.images?.length ?? 0),
+      0
+    )
+    if (!photoCount) {
+      setImageStatus('There are no itinerary photos to remove. Front and last pages are unchanged.')
+      return
+    }
+
+    onDocumentUpdate(resetApproval({
+      ...documentContent,
+      // Clear images ONLY from body sections; front page and last page are untouched
+      sections: documentContent.sections.map(section =>
+        bodySectionIds.has(section.id) && section.images?.length
+          ? { ...section, images: [] }
+          : section
+      ),
+    }))
+    setImageStatus(`Removed ${photoCount} photo${photoCount === 1 ? '' : 's'} from itinerary days in 1 click. Front and last pages are unchanged.`)
+  }, [documentContent, bodySections, bodySectionIds, onDocumentUpdate])
+
+  const handleToggleAllPhotos = useCallback(() => {
+    if (hasBodyPhotos) {
+      handleRemoveAllPhotos()
+    } else {
+      handleAddPhotosToAllPages(true)
+    }
+  }, [hasBodyPhotos, handleRemoveAllPhotos, handleAddPhotosToAllPages])
+
   useEffect(() => {
     const documentKey = documentContent
       ? `${documentContent.metadata.generatedAt}:${documentContent.metadata.prompt}`
       : null
     if (
-      documentContent?.documentType !== 'tour_itinerary' ||
+      !isItinerary ||
       imageCatalog.length === 0 ||
       !documentKey ||
       autoMatchedDocumentKey.current === documentKey
@@ -451,14 +538,14 @@ export function DocumentWorkspace({
 
     autoMatchedDocumentKey.current = documentKey
     void handleAutoMatchImages()
-  }, [documentContent?.documentType, documentContent?.metadata.generatedAt, documentContent?.metadata.prompt, imageCatalog, handleAutoMatchImages])
+  }, [isItinerary, documentContent?.metadata.generatedAt, documentContent?.metadata.prompt, imageCatalog, handleAutoMatchImages])
 
   const handleSaveLocally = async () => {
-    setSaveError(null)
+    setManualSaveError(null)
     try {
       await onSaveDocument()
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save this document locally.')
+      setManualSaveError(err instanceof Error ? err.message : 'Could not save this document locally.')
     }
   }
 
@@ -517,6 +604,28 @@ export function DocumentWorkspace({
           </button>
         </div>
 
+        {/* 1-Click Itinerary Photos Action Button */}
+        {isItinerary && (
+          <button
+            type="button"
+            onClick={handleToggleAllPhotos}
+            disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs active:scale-95 ${
+              hasBodyPhotos
+                ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:text-rose-800'
+                : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+            }`}
+            title={
+              hasBodyPhotos
+                ? 'Remove all itinerary day photos in 1 click (preserves front cover and last page)'
+                : 'Add destination photos to all itinerary days in 1 click (preserves front cover and last page)'
+            }
+          >
+            {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
+            <span>{hasBodyPhotos ? `Remove All Images (${totalBodyPhotos})` : 'Add All Images'}</span>
+          </button>
+        )}
+
         <button
           onClick={onClose}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
@@ -529,7 +638,7 @@ export function DocumentWorkspace({
       <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
         <Palette size={12} className="text-gray-400 flex-shrink-0" />
         <span className="text-xs text-gray-500">Template:</span>
-        {documentContent.documentType === 'tour_itinerary' ? (
+        {isItinerary ? (
           <span className="text-xs font-medium text-gray-700">
             Beyond Escapes Official <span className="font-normal text-gray-400">(fixed for itinerary branding)</span>
           </span>
@@ -548,28 +657,77 @@ export function DocumentWorkspace({
 
       {/* Document Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {documentContent.documentType === 'tour_itinerary' && (
-          <div className="px-4 pt-3">
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 p-2.5">
-              <ImagePlus size={15} className="text-blue-600" />
-              <span className="flex-1 text-xs text-blue-900">
-                {isLoadingImageCatalog
-                  ? 'Loading destination photos...'
-                  : imageCatalog.length
-                  ? `${imageCatalog.length} destination photos available`
-                  : 'Add destination photos to your itinerary'}
-              </span>
-              <button
-                type="button"
-                onClick={handleAutoMatchImages}
-                disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
-                className="rounded-md bg-blue-600 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isMatchingImages ? 'Matching...' : 'Auto-match locations'}
-              </button>
+        {isItinerary && (
+          <div className="sticky top-0 z-10 border-b border-blue-100 bg-white/95 px-4 py-2.5 backdrop-blur-sm shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-blue-700">
+                  <ImagePlus size={15} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-blue-900">
+                      Itinerary Photos
+                    </span>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      hasBodyPhotos ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {hasBodyPhotos ? `${totalBodyPhotos} photo${totalBodyPhotos === 1 ? '' : 's'} added` : 'No photos added'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-blue-700/80">
+                    1-click photo controls for all itinerary days (front cover &amp; last page remain untouched)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* 1-Click Toggle Button */}
+                <button
+                  type="button"
+                  onClick={handleToggleAllPhotos}
+                  disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 ${
+                    hasBodyPhotos
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                  }`}
+                  title={
+                    hasBodyPhotos
+                      ? 'Remove all photos from itinerary days in 1 click (preserves front and back pages)'
+                      : 'Add destination photos to all itinerary days in 1 click (preserves front and back pages)'
+                  }
+                >
+                  {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
+                  <span>{hasBodyPhotos ? 'Remove All Images' : 'Add All Images'}</span>
+                </button>
+
+                {/* Explicit buttons for instant 1-click add or remove anytime */}
+                {hasBodyPhotos ? (
+                  <button
+                    type="button"
+                    onClick={() => handleAddPhotosToAllPages(true)}
+                    disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
+                    className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                    title="Refresh and re-match photos for all itinerary days"
+                  >
+                    <RefreshCw size={11} className={isMatchingImages ? 'animate-spin' : ''} />
+                    <span>Re-match All</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAutoMatchImages}
+                    disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
+                    className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                  >
+                    <span>Auto-match</span>
+                  </button>
+                )}
+              </div>
             </div>
-            {imageStatus && <p className="mt-1.5 text-[10px] text-green-700">{imageStatus}</p>}
-            {imageError && <p className="mt-1.5 text-[10px] text-red-600">{imageError}</p>}
+            {imageStatus && <p className="mt-1 text-[10px] font-medium text-green-700">{imageStatus}</p>}
+            {imageError && <p className="mt-1 text-[10px] font-medium text-red-600">{imageError}</p>}
           </div>
         )}
         {viewMode === 'preview' ? (
@@ -621,7 +779,7 @@ export function DocumentWorkspace({
         <div className="flex items-center justify-between mb-2 text-[10px]">
           <span className={saveStatus === 'error' ? 'text-red-600' : 'text-gray-400'}>
             {saveStatus === 'error'
-              ? saveError || 'Local save failed. Retry to save.'
+              ? saveError || manualSaveError || 'Local save failed. Retry to save.'
               : saveStatus === 'saving'
                 ? 'Saving changes locally...'
                 : saveStatus === 'saved'
@@ -730,7 +888,7 @@ export function DocumentWorkspace({
 
 // Document Preview Component
 function DocumentPreview({ documentContent }: { documentContent: DocumentContent }) {
-  if (documentContent.documentType === 'tour_itinerary') {
+  if (isItineraryDocument(documentContent)) {
     return <ItineraryDocumentPreview documentContent={documentContent} />
   }
 
@@ -1172,7 +1330,8 @@ function DocumentEditor({
   onImageRemove: (sectionId: string, index: number) => void
   uploadingImageSectionId: string | null
 }) {
-  const sectionsToEdit = documentContent.documentType === 'tour_itinerary'
+  const isItinerary = isItineraryDocument(documentContent)
+  const sectionsToEdit = isItinerary
     ? extractItinerarySections(documentContent.sections).remaining
     : documentContent.sections
 
@@ -1197,7 +1356,7 @@ function DocumentEditor({
         />
       </div>
 
-      {documentContent.documentType === 'tour_itinerary' && (
+      {isItinerary && (
         <ItineraryPagesEditor
           documentContent={documentContent}
           onCoverPageUpdate={onCoverPageUpdate}
@@ -1215,7 +1374,7 @@ function DocumentEditor({
           onUpdate={onSectionUpdate}
           onDelete={() => onSectionDelete(section.id)}
           onAddAfter={(type) => onAddSection(section.id, type)}
-          showImageTools={documentContent.documentType === 'tour_itinerary'}
+          showImageTools={isItinerary}
           onImagePick={() => onImagePick(section.id)}
           onImageUpload={file => onImageUpload(section.id, file)}
           onImageRemove={index => onImageRemove(section.id, index)}

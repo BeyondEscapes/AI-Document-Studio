@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateDocx, generatePdf, generateFilename, getExportedFile } from '@/lib/export'
 import { generateBrandedDocx } from '@/lib/docx-template-generator'
 import { addItineraryOpeningPages } from '@/lib/itinerary-opening-pages'
+import { embedCatalogItineraryImages } from '@/lib/itinerary-image-storage'
 import { getTheme, getSettings } from '@/lib/db'
 import path from 'path'
 import type { DocumentContent } from '@/types'
@@ -19,7 +20,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Format must be "docx" or "pdf"' }, { status: 400 })
     }
 
-    const content = await addItineraryOpeningPages(documentContent as DocumentContent)
+    const resolvedContent = embedCatalogItineraryImages(documentContent as DocumentContent)
+    const content = await addItineraryOpeningPages(resolvedContent)
     // Get theme/template
     const settings = getSettings()
     const effectiveThemeId = themeId || settings.defaultThemeId

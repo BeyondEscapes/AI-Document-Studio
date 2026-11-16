@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { ChatPanel } from '@/components/ChatPanel'
 import { DocumentWorkspace } from '@/components/DocumentWorkspace'
+import { prepareDocumentForLocalSave } from '@/lib/itinerary-images'
 import type { Conversation, DocumentContent, DocumentTheme, AppSettings } from '@/types'
 
 export default function StudioPage() {
@@ -18,6 +19,7 @@ export default function StudioPage() {
   const [isDocPanelOpen, setIsDocPanelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [documentSaveStatus, setDocumentSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [documentSaveError, setDocumentSaveError] = useState<string | null>(null)
 
   // Load initial data
   useEffect(() => {
@@ -67,6 +69,7 @@ export default function StudioPage() {
     setDocumentContent(null)
     setIsDocPanelOpen(false)
     setDocumentSaveStatus('idle')
+    setDocumentSaveError(null)
   }, [])
 
   const handleSelectConversation = useCallback(async (conversation: Conversation) => {
@@ -139,24 +142,39 @@ export default function StudioPage() {
     }
 
     setDocumentSaveStatus('saving')
+    setDocumentSaveError(null)
     try {
       const res = await fetch(`/api/conversations/${activeConversation.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentContent: content, selectedTheme: selectedThemeId }),
+        body: JSON.stringify({
+          documentContent: prepareDocumentForLocalSave(content),
+          selectedTheme: selectedThemeId,
+        }),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
+      const responseText = await res.text()
+      let data: { success?: boolean; error?: string; conversation?: Conversation }
+      try {
+        data = JSON.parse(responseText)
+      } catch {
+        if (res.status === 413) {
+          throw new Error('The local server rejected this document as too large. Remove oversized embedded cover images and retry.')
+        }
+        throw new Error(`Could not save this document locally (HTTP ${res.status}).`)
+      }
+      const conversation = data.conversation
+      if (!res.ok || !data.success || !conversation) {
         throw new Error(data.error || 'Could not save this document locally.')
       }
 
-      setActiveConversation(data.conversation)
+      setActiveConversation(conversation)
       setConversations(prev => prev.map(item =>
-        item.id === data.conversation.id ? data.conversation : item
+        item.id === conversation.id ? conversation : item
       ))
       setDocumentSaveStatus('saved')
     } catch (err) {
       setDocumentSaveStatus('error')
+      setDocumentSaveError(err instanceof Error ? err.message : 'Could not save this document locally.')
       throw err
     }
   }, [activeConversation, selectedThemeId])
@@ -233,6 +251,7 @@ export default function StudioPage() {
               onDocumentUpdate={handleDocumentUpdate}
               onSaveDocument={handleSaveDocument}
               saveStatus={documentSaveStatus}
+              saveError={documentSaveError}
               onClose={() => setIsDocPanelOpen(false)}
             />
           </div>
