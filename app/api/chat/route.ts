@@ -163,6 +163,11 @@ export async function POST(request: NextRequest) {
       conversation: {
         id: conversation.id,
         title: conversation.title,
+        messages: conversation.messages,
+        documentContent: conversation.documentContent,
+        selectedTheme: conversation.selectedTheme,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
       },
     })
   } catch (error) {

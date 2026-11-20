@@ -21,7 +21,7 @@ DOCUMENT RULES:
 - If any required field is missing, set documentContent to null and ask a concise question naming the missing fields. The server independently validates these fields before generating.
 - Never invent guest identities, booking or tour references, reservation/transport confirmation status, prices, currencies, totals, tax, invoice identifiers, or travel/issue/due dates. Never calculate invoice totals. Only describe a booking or service as confirmed when the supplied status explicitly confirms it.
 - Itineraries and proposals may include suggestions, but label them as suggestions and never present them as booked services.
-- For tour itineraries, write a clear, authentic, structured itinerary. Write a 80–120 word overview. Structure every travel day with a heading1 containing its day/date and route, followed by one bullet_list of 3–5 concise, chronological key points, then heading2 attraction/activity names with informative paragraphs describing those experiences. Include both pointwise information and descriptive paragraphs on every day; do not make a day entirely bullets or entirely prose, and do not repeat the bullets in the paragraphs. Use times only when supplied; otherwise show the sequence without inventing exact times. Aim for 70–110 words per day across the points and paragraphs where the supplied facts support it. Avoid filler and repetition, and never invent services, bookings, destination facts, or cancellation terms.
+- For tour itineraries, write a focused, fast, and structured itinerary. Write a 50–70 word overview. Structure every travel day with a heading1 containing its day/date and route, followed by one bullet_list of 3 concise, chronological key points, then heading2 attraction/activity names with a crisp 40–60 word descriptive paragraph. Keep each day sharp, authentic, and fast to read without filler. Use times only when supplied; otherwise show the sequence without inventing exact times.
 - The export automatically adds one branded opening page with the itinerary title, Ayubowan welcome artwork, Sri Lanka route map, overview and company contact details, plus a separate final page with the cancellation policy, Beyond Escapes contact details, logos, and styling. Do not generate duplicate cover, map, welcome, cancellation-policy, or contact pages.
 - Use a clear route-led title. Under each daily heading, put the chronological bullet list first, then attraction/activity subheadings and descriptive paragraphs; include accommodation details only when supplied. Keep the document practical and specific rather than padding it to meet a word count.
 - Preserve the user's language. Use a professional tone and Beyond Escapes branding. For edits, retain the document type and structured details unless the user changes them.
@@ -37,17 +37,13 @@ For general questions, greetings, or quick clarifications that are not document 
 export const AVAILABLE_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-3.5-flash',
-  'gemini-3.8-flash',
-  'gemini-3.1-flash-lite',
-  'gemini-3.5-flash-lite',
+  'gemini-2.0-flash-lite',
   'gemini-1.5-flash',
 ]
 
 // Map requested model with fallback to fastest responsive flash model
 export function normalizeModel(model?: string): string {
-  if (!model) return 'gemini-2.5-flash'
+  if (!model || model.startsWith('gemini-3')) return 'gemini-2.5-flash'
   return model
 }
 
@@ -84,7 +80,13 @@ export async function generateDocumentContent(
         history: conversationHistory,
       })
 
-      const response = await chat.sendMessage({ message: userMessage })
+      // Race with 15-second timeout per model to guarantee lightning-fast fallback if a model stalls
+      const sendPromise = chat.sendMessage({ message: userMessage })
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Model ${modelToTry} timed out after 15s`)), 15000)
+      )
+
+      const response = await Promise.race([sendPromise, timeoutPromise])
       const text = response.text || ''
 
       // Parse JSON response
@@ -113,17 +115,17 @@ export async function generateDocumentContent(
       if (status === 401 || status === 403 || (Array.isArray(err?.details) && err.details.some((detail: any) => detail?.reason === 'ACCESS_TOKEN_TYPE_UNSUPPORTED'))) {
         throw new Error('Google rejected GEMINI_API_KEY. In Vercel, set it to the raw API key from Google AI Studio (not the GEMINI_API_KEY= assignment), enable it for the deployment environment, and redeploy.')
       }
-      const isTransient = status === 503 || status === 429 || status === 404 || err?.message?.includes('high demand')
+      const isTransient = status === 503 || status === 429 || status === 404 || err?.message?.includes('high demand') || err?.message?.includes('timed out')
       
-      console.warn(`Model ${modelToTry} attempt failed (status ${status}). Trying next model...`)
+      console.warn(`Model ${modelToTry} attempt failed (${err?.message || status}). Trying next model...`)
 
       if (!isTransient) {
         // Non-transient error (e.g. auth), break early
         break
       }
 
-      // Brief backoff before next model to ensure fast recovery without stalling
-      await new Promise(r => setTimeout(r, 100))
+      // Brief 50ms backoff before next model
+      await new Promise(r => setTimeout(r, 50))
     }
   }
 

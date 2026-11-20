@@ -81,24 +81,29 @@ export function ChatPanel({
     const tempLoadingMsg: ChatMessage = {
       id: 'temp-loading-' + Date.now(),
       role: 'assistant',
-      content: '',
+      content: 'Generating itinerary...',
       timestamp: new Date().toISOString(),
       isLoading: true,
     }
     setMessages(prev => [...prev, tempUserMsg, tempLoadingMsg])
     setIsLoading(true)
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 28000)
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           message: text,
           conversationId: currentConvId.current,
-          model: settings?.geminiModel || 'gemini-3.5-flash',
+          model: settings?.geminiModel || 'gemini-2.5-flash',
           selectedThemeId,
         }),
       })
+      clearTimeout(timeoutId)
 
       const data = await res.json()
 
@@ -108,22 +113,30 @@ export function ChatPanel({
 
       if (data.success) {
         currentConvId.current = data.conversationId
-        // Instantly update using data.conversation returned directly by /api/chat (no redundant network round-trip)
-        if (data.conversation) {
+        // Instantly update using data.conversation returned directly by /api/chat
+        if (data.conversation && Array.isArray(data.conversation.messages)) {
           setMessages(data.conversation.messages)
           onMessageSent(data.conversation, data.message?.documentContent, data.documentCleared)
+        } else if (data.message) {
+          setMessages(prev => [...prev.filter(m => !m.isLoading), data.message])
+          if (data.conversation) {
+            onMessageSent(data.conversation, data.message?.documentContent, data.documentCleared)
+          }
         } else {
           // Fallback if conversation object was omitted
           const convRes = await fetch(`/api/conversations/${data.conversationId}`)
           const convData = await convRes.json()
-          if (convData.success) {
+          if (convData.success && convData.conversation) {
             setMessages(convData.conversation.messages)
             onMessageSent(convData.conversation, data.message?.documentContent, data.documentCleared)
           }
         }
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Failed to send message. Please try again.'
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+      const errMsg = err?.name === 'AbortError'
+        ? 'Generation timed out. Please try sending again.'
+        : err instanceof Error ? err.message : 'Failed to send message. Please try again.'
       setError(errMsg)
       // Remove loading message
       setMessages(prev => prev.filter(m => !m.isLoading && m.id !== tempUserMsg.id))
@@ -314,12 +327,15 @@ function ChatMessageBubble({ message, onViewDocument }: { message: ChatMessage; 
         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
           <Sparkles size={13} className="text-white" />
         </div>
-        <div className="flex-1 bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3">
-          <div className="flex items-center gap-1.5">
+        <div className="flex-1 bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <div className="loading-dot"></div>
             <div className="loading-dot"></div>
             <div className="loading-dot"></div>
           </div>
+          {message.content ? (
+            <span className="text-xs text-blue-600 font-medium animate-pulse">{message.content}</span>
+          ) : null}
         </div>
       </div>
     )
