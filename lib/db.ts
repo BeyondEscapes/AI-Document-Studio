@@ -71,7 +71,7 @@ function initSchema(db: Database.Database) {
   const defaultSettings: AppSettings = {
     defaultThemeId: 'beyond-escapes-official',
     defaultOutputFormats: ['docx', 'pdf'],
-    geminiModel: 'gemini-3.8-flash',
+    geminiModel: 'gemini-3.1-flash-lite',
     language: 'English',
     autoSave: true,
   }
@@ -82,8 +82,8 @@ function initSchema(db: Database.Database) {
     } else if (key === 'geminiModel') {
       try {
         const currentVal = JSON.parse(existing.value)
-        if (typeof currentVal === 'string' && (currentVal.includes('gemini-2.0') || !currentVal)) {
-          db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(JSON.stringify('gemini-3.8-flash'), key)
+        if (typeof currentVal === 'string' && (currentVal.includes('gemini-2.0') || currentVal.includes('gemini-1.5') || !currentVal)) {
+          db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(JSON.stringify('gemini-3.1-flash-lite'), key)
         }
       } catch {}
     }
@@ -200,9 +200,9 @@ export function setSetting(key: string, value: unknown): void {
 }
 
 export function getSettings(): AppSettings {
-  const model = getSetting('geminiModel', 'gemini-3.8-flash')
-  const effectiveModel = (typeof model === 'string' && (model.includes('gemini-2.0') || !model))
-    ? 'gemini-3.8-flash'
+  const model = getSetting('geminiModel', 'gemini-3.1-flash-lite')
+  const effectiveModel = (typeof model === 'string' && (model.includes('gemini-2.0') || model.includes('gemini-1.5') || !model))
+    ? 'gemini-3.1-flash-lite'
     : model
 
   return {

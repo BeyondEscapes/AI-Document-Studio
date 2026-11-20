@@ -35,25 +35,24 @@ For general questions, greetings, or quick clarifications that are not document 
 
 // High-performance models in priority order for low latency and high availability
 export const AVAILABLE_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-3.5-flash',
   'gemini-3.1-flash-lite',
   'gemini-3.5-flash-lite',
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
 ]
 
 // Map requested model with fallback to fastest responsive flash model
 export function normalizeModel(model?: string): string {
-  if (!model) return 'gemini-3.8-flash'
-  if (model.includes('gemini-2.0')) return 'gemini-3.8-flash'
+  if (!model || model.includes('gemini-2.0') || model.includes('gemini-1.5') || model.includes('gemini-2.5')) {
+    return 'gemini-3.1-flash-lite'
+  }
   return model
 }
 
 export async function generateDocumentContent(
   userMessage: string,
   conversationHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
-  requestedModel: string = 'gemini-3.8-flash'
+  requestedModel: string = 'gemini-3.1-flash-lite'
 ): Promise<{
   message: string
   documentContent: DocumentContent | null
@@ -83,10 +82,10 @@ export async function generateDocumentContent(
         history: conversationHistory,
       })
 
-      // Race with 15-second timeout per model to guarantee lightning-fast fallback if a model stalls
+      // Race with 8-second timeout per model to guarantee lightning-fast fallback if a model stalls
       const sendPromise = chat.sendMessage({ message: userMessage })
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Model ${modelToTry} timed out after 15s`)), 15000)
+        setTimeout(() => reject(new Error(`Model ${modelToTry} timed out after 8s`)), 8000)
       )
 
       const response = await Promise.race([sendPromise, timeoutPromise])

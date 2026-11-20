@@ -89,7 +89,7 @@ export function ChatPanel({
     setIsLoading(true)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 28000)
+    const timeoutId = setTimeout(() => controller.abort(), 45000)
 
     try {
       const res = await fetch('/api/chat', {
@@ -99,7 +99,7 @@ export function ChatPanel({
         body: JSON.stringify({
           message: text,
           conversationId: currentConvId.current,
-          model: settings?.geminiModel || 'gemini-3.8-flash',
+          model: settings?.geminiModel || 'gemini-3.1-flash-lite',
           selectedThemeId,
         }),
       })
