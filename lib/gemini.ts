@@ -21,7 +21,7 @@ DOCUMENT RULES:
 - If any required field is missing, set documentContent to null and ask a concise question naming the missing fields. The server independently validates these fields before generating.
 - Never invent guest identities, booking or tour references, reservation/transport confirmation status, prices, currencies, totals, tax, invoice identifiers, or travel/issue/due dates. Never calculate invoice totals. Only describe a booking or service as confirmed when the supplied status explicitly confirms it.
 - Itineraries and proposals may include suggestions, but label them as suggestions and never present them as booked services.
-- For tour itineraries, target about 1,350–1,650 words in the generated sections for a typical week-long trip, scaling shorter trips down and longer trips up. Write a 100–140 word overview. Structure every travel day with a heading1 containing its day/date and route, followed by one bullet_list of 3–6 concise, chronological key points, then heading2 attraction/activity names with informative paragraphs describing those experiences. Include both pointwise information and descriptive paragraphs on every day; do not make a day entirely bullets or entirely prose, and do not repeat the bullets in the paragraphs. Use times only when supplied; otherwise show the sequence without inventing exact times. Aim for 90–140 words per day across the points and paragraphs where the supplied facts support it. Avoid repetition and never invent services, bookings, destination facts, or cancellation terms.
+- For tour itineraries, write a clear, authentic, structured itinerary. Write a 80–120 word overview. Structure every travel day with a heading1 containing its day/date and route, followed by one bullet_list of 3–5 concise, chronological key points, then heading2 attraction/activity names with informative paragraphs describing those experiences. Include both pointwise information and descriptive paragraphs on every day; do not make a day entirely bullets or entirely prose, and do not repeat the bullets in the paragraphs. Use times only when supplied; otherwise show the sequence without inventing exact times. Aim for 70–110 words per day across the points and paragraphs where the supplied facts support it. Avoid filler and repetition, and never invent services, bookings, destination facts, or cancellation terms.
 - The export automatically adds one branded opening page with the itinerary title, Ayubowan welcome artwork, Sri Lanka route map, overview and company contact details, plus a separate final page with the cancellation policy, Beyond Escapes contact details, logos, and styling. Do not generate duplicate cover, map, welcome, cancellation-policy, or contact pages.
 - Use a clear route-led title. Under each daily heading, put the chronological bullet list first, then attraction/activity subheadings and descriptive paragraphs; include accommodation details only when supplied. Keep the document practical and specific rather than padding it to meet a word count.
 - Preserve the user's language. Use a professional tone and Beyond Escapes branding. For edits, retain the document type and structured details unless the user changes them.
@@ -31,29 +31,30 @@ Always return valid JSON without markdown fences:
 
 When all required fields are present, set documentContent to {"title":"Document title","sections":[{"id":"unique-id","type":"heading1","content":"Section heading"},{"id":"unique-id","type":"paragraph","content":"Document text"},{"id":"unique-id","type":"bullet_list","content":"","items":["Item"]},{"id":"unique-id","type":"table","content":"","headers":["Column"],"rows":[["Value"]]}],"metadata":{"language":"English","tone":"professional"}}. Supported section types: title, heading1 (brand-blue section bar), heading2 (underlined subheading), heading3, paragraph, bullet_list, numbered_list, table, page_break. Keep sections focused and do not invent facts or duplicate structured details.
 
-For general questions or greetings that are not document requests, return {"message":"Response text","isNewDocument":false,"documentIntake":null,"documentContent":null}.`
+For general questions, greetings, or quick clarifications that are not document requests, respond immediately and concisely in 1–2 friendly sentences: {"message":"Response text","isNewDocument":false,"documentIntake":null,"documentContent":null}.`
 
-// Fallback models in priority order if a model experiences 503 high demand or 429
+// High-performance models in priority order for low latency and high availability
 export const AVAILABLE_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
   'gemini-3.5-flash',
   'gemini-3.8-flash',
   'gemini-3.1-flash-lite',
   'gemini-3.5-flash-lite',
+  'gemini-1.5-flash',
 ]
 
-// Map deprecated models to active high-availability models
+// Map requested model with fallback to fastest responsive flash model
 export function normalizeModel(model?: string): string {
-  if (!model) return 'gemini-3.5-flash'
-  if (model.includes('gemini-2.0') || model.includes('gemini-1.5') || model.includes('gemini-2.5')) {
-    return 'gemini-3.5-flash'
-  }
+  if (!model) return 'gemini-2.5-flash'
   return model
 }
 
 export async function generateDocumentContent(
   userMessage: string,
   conversationHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
-  requestedModel: string = 'gemini-3.5-flash'
+  requestedModel: string = 'gemini-2.5-flash'
 ): Promise<{
   message: string
   documentContent: DocumentContent | null
@@ -72,60 +73,57 @@ export async function generateDocumentContent(
   let lastError: Error | null = null
 
   for (const modelToTry of modelQueue) {
-    // Retry up to 2 times for each model
-    for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const chat = client.chats.create({
+        model: modelToTry,
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          temperature: 0.2,
+          maxOutputTokens: 8192,
+        },
+        history: conversationHistory,
+      })
+
+      const response = await chat.sendMessage({ message: userMessage })
+      const text = response.text || ''
+
+      // Parse JSON response
       try {
-        const chat = client.chats.create({
-          model: modelToTry,
-          config: {
-            systemInstruction: SYSTEM_PROMPT,
-            temperature: 0.3,
-            maxOutputTokens: 8192,
-          },
-          history: conversationHistory,
-        })
+        const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+        const parsed = JSON.parse(cleaned) as Record<string, unknown>
+        const documentIntake = normalizeDocumentIntake(parsed.documentIntake)
 
-        const response = await chat.sendMessage({ message: userMessage })
-        const text = response.text || ''
-
-        // Parse JSON response
-        try {
-          const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-          const parsed = JSON.parse(cleaned) as Record<string, unknown>
-          const documentIntake = normalizeDocumentIntake(parsed.documentIntake)
-
-          return {
-            message: typeof parsed.message === 'string' ? parsed.message : 'Please describe the document you need.',
-            documentContent: normalizeDocumentContent(parsed.documentContent, userMessage, documentIntake),
-            documentIntake,
-            isNewDocument: parsed.isNewDocument === true,
-          }
-        } catch {
-          return {
-            message: text,
-            documentContent: null,
-            documentIntake: null,
-            isNewDocument: false,
-          }
+        return {
+          message: typeof parsed.message === 'string' ? parsed.message : 'Please describe the document you need.',
+          documentContent: normalizeDocumentContent(parsed.documentContent, userMessage, documentIntake),
+          documentIntake,
+          isNewDocument: parsed.isNewDocument === true,
         }
-      } catch (err: any) {
-        lastError = err
-        const status = err?.status || err?.code
-        if (status === 401 || status === 403 || (Array.isArray(err?.details) && err.details.some((detail: any) => detail?.reason === 'ACCESS_TOKEN_TYPE_UNSUPPORTED'))) {
-          throw new Error('Google rejected GEMINI_API_KEY. In Vercel, set it to the raw API key from Google AI Studio (not the GEMINI_API_KEY= assignment), enable it for the deployment environment, and redeploy.')
+      } catch {
+        return {
+          message: text,
+          documentContent: null,
+          documentIntake: null,
+          isNewDocument: false,
         }
-        const isTransient = status === 503 || status === 429 || status === 404 || err?.message?.includes('high demand')
-        
-        console.warn(`Model ${modelToTry} attempt ${attempt + 1} failed (status ${status}). Trying next...`)
-
-        if (!isTransient) {
-          // Non-transient error (e.g. auth), break early
-          break
-        }
-
-        // Wait short backoff before next try
-        await new Promise(r => setTimeout(r, (attempt + 1) * 1000))
       }
+    } catch (err: any) {
+      lastError = err
+      const status = err?.status || err?.code
+      if (status === 401 || status === 403 || (Array.isArray(err?.details) && err.details.some((detail: any) => detail?.reason === 'ACCESS_TOKEN_TYPE_UNSUPPORTED'))) {
+        throw new Error('Google rejected GEMINI_API_KEY. In Vercel, set it to the raw API key from Google AI Studio (not the GEMINI_API_KEY= assignment), enable it for the deployment environment, and redeploy.')
+      }
+      const isTransient = status === 503 || status === 429 || status === 404 || err?.message?.includes('high demand')
+      
+      console.warn(`Model ${modelToTry} attempt failed (status ${status}). Trying next model...`)
+
+      if (!isTransient) {
+        // Non-transient error (e.g. auth), break early
+        break
+      }
+
+      // Brief backoff before next model to ensure fast recovery without stalling
+      await new Promise(r => setTimeout(r, 100))
     }
   }
 

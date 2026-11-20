@@ -6,7 +6,7 @@ import {
   FileText, Download, X, Edit3, Eye, FileDown,
   ChevronDown, ChevronUp, Trash2, Plus, AlertCircle,
   CheckCircle, Loader2, Palette, RefreshCw, Save, BadgeCheck,
-  ImagePlus, Search, Upload,
+  ImagePlus, Search, Upload, Sliders,
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel, getMissingRequiredFields } from '@/lib/business-documents'
 import {
@@ -18,6 +18,7 @@ import {
 } from '@/lib/itinerary-images'
 import { getInitialRouteStops } from '@/lib/itinerary-route'
 import { extractItinerarySections, getItineraryPageContent } from '@/lib/itinerary-page-content'
+import { applyDetailLevel, DETAIL_LEVEL_CONFIGS } from '@/lib/itinerary-detail-levels'
 import ItineraryMapEditor from '@/components/ItineraryMapEditor'
 import type {
   DocumentContent,
@@ -28,6 +29,7 @@ import type {
   ItineraryCoverSettings,
   ItineraryImageCatalogItem,
   ItineraryRouteStop,
+  ItineraryDetailLevel,
 } from '@/types'
 
 interface DocumentWorkspaceProps {
@@ -540,6 +542,19 @@ export function DocumentWorkspace({
     void handleAutoMatchImages()
   }, [isItinerary, documentContent?.metadata.generatedAt, documentContent?.metadata.prompt, imageCatalog, handleAutoMatchImages])
 
+  const [detailStatus, setDetailStatus] = useState<string | null>(null)
+  const currentDetailLevel: ItineraryDetailLevel = documentContent?.detailLevel || 'medium'
+
+  const handleDetailLevelChange = useCallback((level: ItineraryDetailLevel) => {
+    if (!documentContent) return
+    if ((documentContent.detailLevel || 'medium') === level) return
+    setDetailStatus(null)
+    const updated = applyDetailLevel(documentContent, level)
+    onDocumentUpdate(resetApproval(updated))
+    const config = DETAIL_LEVEL_CONFIGS[level]
+    setDetailStatus(`Switched to ${config.label} detail level (${config.sublabel}). Front and closing pages are preserved.`)
+  }, [documentContent, onDocumentUpdate])
+
   const handleSaveLocally = async () => {
     setManualSaveError(null)
     try {
@@ -658,7 +673,73 @@ export function DocumentWorkspace({
       {/* Document Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {isItinerary && (
-          <div className="sticky top-0 z-10 border-b border-blue-100 bg-white/95 px-4 py-2.5 backdrop-blur-sm shadow-xs">
+          <div className="sticky top-0 z-10 border-b border-blue-100 bg-white/95 px-4 py-2.5 backdrop-blur-sm shadow-xs space-y-2">
+            {/* 3 Functional Detail Level Buttons: Low, Medium, High */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/70 p-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
+                  <Sliders size={15} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-indigo-900">
+                      Itinerary Detail Level
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
+                      {DETAIL_LEVEL_CONFIGS[currentDetailLevel].badgeText}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-indigo-700/80">
+                    Adjust document depth: Low (short &amp; sweet), Medium (current size), or High (extra advanced details)
+                  </p>
+                </div>
+              </div>
+
+              <div className="inline-flex items-center rounded-lg border border-indigo-200 bg-white p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => handleDetailLevelChange('low')}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                    currentDetailLevel === 'low'
+                      ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                  title="Low: Short & sweet, concise daily highlights for quick reading"
+                >
+                  <span>Low</span>
+                  <span className="hidden sm:inline text-[10px] opacity-80">(Short &amp; Sweet)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDetailLevelChange('medium')}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                    currentDetailLevel === 'medium'
+                      ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                  title="Medium: Current standard document size"
+                >
+                  <span>Medium</span>
+                  <span className="hidden sm:inline text-[10px] opacity-80">(Current Size)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDetailLevelChange('high')}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                    currentDetailLevel === 'high'
+                      ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                  title="High: Extra advanced details, timing guides & comprehensive context"
+                >
+                  <span>High</span>
+                  <span className="hidden sm:inline text-[10px] opacity-80">(Extra Details)</span>
+                </button>
+              </div>
+            </div>
+            {detailStatus && <p className="text-[10px] font-medium text-indigo-700">{detailStatus}</p>}
+
+            {/* Itinerary Photos 1-Click Controls */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5">
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-blue-700">

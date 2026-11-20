@@ -108,12 +108,18 @@ export function ChatPanel({
 
       if (data.success) {
         currentConvId.current = data.conversationId
-        // Reload full conversation to get accurate state
-        const convRes = await fetch(`/api/conversations/${data.conversationId}`)
-        const convData = await convRes.json()
-        if (convData.success) {
-          setMessages(convData.conversation.messages)
-          onMessageSent(convData.conversation, data.message?.documentContent, data.documentCleared)
+        // Instantly update using data.conversation returned directly by /api/chat (no redundant network round-trip)
+        if (data.conversation) {
+          setMessages(data.conversation.messages)
+          onMessageSent(data.conversation, data.message?.documentContent, data.documentCleared)
+        } else {
+          // Fallback if conversation object was omitted
+          const convRes = await fetch(`/api/conversations/${data.conversationId}`)
+          const convData = await convRes.json()
+          if (convData.success) {
+            setMessages(convData.conversation.messages)
+            onMessageSent(convData.conversation, data.message?.documentContent, data.documentCleared)
+          }
         }
       }
     } catch (err) {

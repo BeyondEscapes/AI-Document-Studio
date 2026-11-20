@@ -52,19 +52,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Build conversation history for Gemini (excluding system messages)
-    const history = conversation.messages
+    // Build lightweight conversation history for Gemini (excluding system messages)
+    // Keep recent sliding window and compact active document references to maximize Gemini response speed
+    const recentMessages = conversation.messages
       .filter(m => m.role !== 'system' && !m.isLoading)
-      .map(m => ({
-        role: m.role === 'assistant' ? 'model' as const : 'user' as const,
-        parts: [{ text: m.role === 'assistant' && (m.documentContent || m.documentIntake)
-          ? JSON.stringify({
-              message: m.content,
-              ...(m.documentIntake ? { documentIntake: m.documentIntake } : {}),
-              ...(m.documentContent ? { documentContent: m.documentContent } : {}),
-            })
-          : m.content }],
-      }))
+      .slice(-8)
+
+    const history = recentMessages.map(m => {
+      let textContent = m.content
+      if (m.role === 'assistant' && (m.documentContent || m.documentIntake)) {
+        // Send a lightweight representation to save thousands of tokens and drastically reduce latency
+        const compactContext: Record<string, unknown> = { message: m.content }
+        if (m.documentIntake) {
+          compactContext.documentIntake = m.documentIntake
+        }
+        if (m.documentContent) {
+          compactContext.activeDocument = {
+            title: m.documentContent.title,
+            documentType: m.documentContent.documentType,
+          }
+        }
+        textContent = JSON.stringify(compactContext)
+      }
+      return {
+        role: m.role === 'assistant' ? ('model' as const) : ('user' as const),
+        parts: [{ text: textContent }],
+      }
+    })
     const previousIntake = [...conversation.messages]
       .reverse()
       .find(m => m.documentIntake)?.documentIntake

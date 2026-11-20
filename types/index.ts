@@ -79,6 +79,8 @@ export interface ItineraryImageCatalogItem {
   height: number
 }
 
+export type ItineraryDetailLevel = 'low' | 'medium' | 'high'
+
 export interface DocumentContent {
   title: string
   sections: DocumentSection[]
@@ -87,6 +89,12 @@ export interface DocumentContent {
   itineraryPages?: ItineraryPageSettings
   coverImage?: DocumentImage
   closingLogo?: DocumentImage
+  detailLevel?: ItineraryDetailLevel
+  detailVariants?: {
+    low?: DocumentSection[]
+    medium?: DocumentSection[]
+    high?: DocumentSection[]
+  }
   approval?: {
     status: 'draft' | 'approved'
     approvedAt?: string
