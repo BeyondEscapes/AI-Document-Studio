@@ -99,7 +99,7 @@ export function ChatPanel({
         body: JSON.stringify({
           message: text,
           conversationId: currentConvId.current,
-          model: settings?.geminiModel || 'gemini-2.5-flash',
+          model: settings?.geminiModel || 'gemini-3.8-flash',
           selectedThemeId,
         }),
       })

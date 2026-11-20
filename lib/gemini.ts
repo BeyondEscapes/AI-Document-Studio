@@ -35,22 +35,25 @@ For general questions, greetings, or quick clarifications that are not document 
 
 // High-performance models in priority order for low latency and high availability
 export const AVAILABLE_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
   'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
   'gemini-1.5-flash',
 ]
 
 // Map requested model with fallback to fastest responsive flash model
 export function normalizeModel(model?: string): string {
-  if (!model || model.startsWith('gemini-3')) return 'gemini-2.5-flash'
+  if (!model) return 'gemini-3.8-flash'
+  if (model.includes('gemini-2.0')) return 'gemini-3.8-flash'
   return model
 }
 
 export async function generateDocumentContent(
   userMessage: string,
   conversationHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
-  requestedModel: string = 'gemini-2.5-flash'
+  requestedModel: string = 'gemini-3.8-flash'
 ): Promise<{
   message: string
   documentContent: DocumentContent | null

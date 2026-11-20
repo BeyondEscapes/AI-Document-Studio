@@ -288,14 +288,14 @@ export function Sidebar({
                 <div>
                   <p className="text-[10px] font-medium text-gray-500 mb-1">AI Model</p>
                   <select
-                    value={settings?.geminiModel || 'gemini-2.5-flash'}
+                    value={settings?.geminiModel || 'gemini-3.8-flash'}
                     onChange={e => onSettingsUpdate({ geminiModel: e.target.value })}
                     className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
                   >
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Ultra Fast - Recommended)</option>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
-                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (Lightweight)</option>
-                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Standard)</option>
+                    <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest - Recommended)</option>
+                    <option value="gemini-3.5-flash">Gemini 3.5 Flash (High Stability)</option>
+                    <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Fastest)</option>
+                    <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
                   </select>
                 </div>
 
