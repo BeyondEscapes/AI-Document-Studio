@@ -132,7 +132,7 @@ To grant administrator access, create the account first and run the following co
 npm run promote-admin -- name@example.com
 ```
 
-Administrators can open `/admin` to review users and manage team documents. Pre-existing local conversations and documents appear as unassigned to administrators. Accounts, sessions, and saved documents use the studio’s SQLite database. For hosted use, point `STUDIO_DATA_DIR` at a persistent, writable volume shared with the admin command.
+Administrators can open `/admin` to review users and manage team documents. Pre-existing local conversations and documents appear as unassigned to administrators. Local accounts and sessions use SQLite. Vercel deployments without a persistent `STUDIO_DATA_DIR` use Atlas for accounts and sessions. Set `MONGODB_URI` and `MONGODB_DB` in the Vercel environment before deploying. Users who signed up on the old temporary backend need to sign up again. For an Atlas account, use `npm run promote-admin -- name@example.com --mongo` with the same MongoDB configuration as the deployment. Saved documents still require persistent SQLite storage.
 
 ### Optional: Import an Itinerary Photo Library
 

@@ -10,8 +10,12 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZ
 export default async function AdminPage() {
   const user = await requireUser()
   if (user.role !== 'admin') redirect('/documents')
-  const documents = listSavedDocuments(user, true)
-  const users = listUsers()
+  const users = await listUsers()
+  const owners = new Map(users.map(account => [account.id, account.name]))
+  const documents = listSavedDocuments(user, true).map(document => ({
+    ...document,
+    ownerName: document.ownerId ? owners.get(document.ownerId) ?? document.ownerName : null,
+  }))
   const metrics = [
     { label: 'Accounts', value: users.length, icon: Users },
     { label: 'Saved documents', value: documents.length, icon: FileText },

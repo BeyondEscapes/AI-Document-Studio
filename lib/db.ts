@@ -201,6 +201,7 @@ export interface SavedDocument {
   status: string
   updatedAt: string
   ownerName: string | null
+  ownerId: string | null
 }
 
 export function listSavedDocuments(user: ConversationAccess, all = false): SavedDocument[] {
@@ -209,7 +210,7 @@ export function listSavedDocuments(user: ConversationAccess, all = false): Saved
       COALESCE(NULLIF(json_extract(document_content, '$.title'), ''), title) AS title,
       COALESCE(json_extract(document_content, '$.documentType'), 'other') AS type,
       COALESCE(json_extract(document_content, '$.approval.status'), 'draft') AS status,
-      updated_at AS updatedAt, users.name AS ownerName
+      updated_at AS updatedAt, users.name AS ownerName, conversations.owner_id AS ownerId
     FROM conversations LEFT JOIN users ON users.id = conversations.owner_id
     WHERE document_content IS NOT NULL AND (owner_id = ? OR (? AND (owner_id IS NULL OR ?)))
     ORDER BY updated_at DESC
