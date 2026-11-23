@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import {
-  FileText, Download, X, Edit3, Eye, FileDown,
+  FileText, Download, X, Edit3, Eye, EyeOff, FileDown,
   ChevronDown, ChevronUp, Trash2, Plus, AlertCircle,
   CheckCircle, Loader2, Palette, RefreshCw, Save, BadgeCheck,
   ImagePlus, Search, Upload, Sliders,
@@ -543,6 +543,7 @@ export function DocumentWorkspace({
   }, [isItinerary, documentContent?.metadata.generatedAt, documentContent?.metadata.prompt, imageCatalog, handleAutoMatchImages])
 
   const [detailStatus, setDetailStatus] = useState<string | null>(null)
+  const [isControlsBarHidden, setIsControlsBarHidden] = useState(false)
   const currentDetailLevel: ItineraryDetailLevel = documentContent?.detailLevel || 'medium'
 
   const handleDetailLevelChange = useCallback((level: ItineraryDetailLevel) => {
@@ -621,24 +622,40 @@ export function DocumentWorkspace({
 
         {/* 1-Click Itinerary Photos Action Button */}
         {isItinerary && (
-          <button
-            type="button"
-            onClick={handleToggleAllPhotos}
-            disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs active:scale-95 ${
-              hasBodyPhotos
-                ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:text-rose-800'
-                : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
-            }`}
-            title={
-              hasBodyPhotos
-                ? 'Remove all itinerary day photos in 1 click (preserves front cover and last page)'
-                : 'Add destination photos to all itinerary days in 1 click (preserves front cover and last page)'
-            }
-          >
-            {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
-            <span>{hasBodyPhotos ? `Remove All Images (${totalBodyPhotos})` : 'Add All Images'}</span>
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setIsControlsBarHidden(prev => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                isControlsBarHidden
+                  ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
+              }`}
+              title={isControlsBarHidden ? 'Show itinerary controls' : 'Hide itinerary controls'}
+            >
+              {isControlsBarHidden ? <Eye size={12} /> : <EyeOff size={12} />}
+              <span className="hidden sm:inline">{isControlsBarHidden ? 'Show Controls' : 'Hide Controls'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleAllPhotos}
+              disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs active:scale-95 ${
+                hasBodyPhotos
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:text-rose-800'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+              }`}
+              title={
+                hasBodyPhotos
+                  ? 'Remove all itinerary day photos in 1 click (preserves front cover and last page)'
+                  : 'Add destination photos to all itinerary days in 1 click (preserves front cover and last page)'
+              }
+            >
+              {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
+              <span>{hasBodyPhotos ? `Remove All Images (${totalBodyPhotos})` : 'Add All Images'}</span>
+            </button>
+          </>
         )}
 
         <button
@@ -673,143 +690,230 @@ export function DocumentWorkspace({
       {/* Document Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {isItinerary && (
-          <div className="sticky top-0 z-10 border-b border-blue-100 bg-white/95 px-4 py-2.5 backdrop-blur-sm shadow-xs space-y-2">
-            {/* 3 Functional Detail Level Buttons: Low, Medium, High */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/70 p-2.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
-                  <Sliders size={15} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-indigo-900">
-                      Itinerary Detail Level
-                    </span>
-                    <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
-                      {DETAIL_LEVEL_CONFIGS[currentDetailLevel].badgeText}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-indigo-700/80">
-                    Adjust document depth: Low (short &amp; sweet), Medium (current size), or High (extra advanced details)
-                  </p>
-                </div>
+          isControlsBarHidden ? (
+            /* Collapsed / Hidden Toolbar View */
+            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-4 py-2 backdrop-blur-sm shadow-xs flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-semibold text-gray-700 flex items-center gap-1.5">
+                  <Sliders size={13} className="text-indigo-600" />
+                  Itinerary Controls
+                </span>
+                <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 border border-indigo-100">
+                  Detail: {DETAIL_LEVEL_CONFIGS[currentDetailLevel].label}
+                </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                  hasBodyPhotos ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-600 border-gray-200'
+                }`}>
+                  Photos: {hasBodyPhotos ? `${totalBodyPhotos} added` : 'None'}
+                </span>
               </div>
-
-              <div className="inline-flex items-center rounded-lg border border-indigo-200 bg-white p-0.5 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => handleDetailLevelChange('low')}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                    currentDetailLevel === 'low'
-                      ? 'bg-indigo-600 text-white shadow-xs font-semibold'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="Low: Short & sweet, concise daily highlights for quick reading"
-                >
-                  <span>Low</span>
-                  <span className="hidden sm:inline text-[10px] opacity-80">(Short &amp; Sweet)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDetailLevelChange('medium')}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                    currentDetailLevel === 'medium'
-                      ? 'bg-indigo-600 text-white shadow-xs font-semibold'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="Medium: Current standard document size"
-                >
-                  <span>Medium</span>
-                  <span className="hidden sm:inline text-[10px] opacity-80">(Current Size)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDetailLevelChange('high')}
-                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                    currentDetailLevel === 'high'
-                      ? 'bg-indigo-600 text-white shadow-xs font-semibold'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="High: Extra advanced details, timing guides & comprehensive context"
-                >
-                  <span>High</span>
-                  <span className="hidden sm:inline text-[10px] opacity-80">(Extra Details)</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsControlsBarHidden(false)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors shadow-2xs"
+                title="Show Detail Level and Photo controls"
+              >
+                <Eye size={12} />
+                <span>Show Controls</span>
+              </button>
             </div>
-            {detailStatus && <p className="text-[10px] font-medium text-indigo-700">{detailStatus}</p>}
-
-            {/* Itinerary Photos 1-Click Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-blue-700">
-                  <ImagePlus size={15} />
+          ) : (
+            /* Full Expanded Controls View */
+            <div className="sticky top-0 z-10 border-b border-blue-100 bg-white/95 px-4 py-2.5 backdrop-blur-sm shadow-xs space-y-2">
+              {/* Controls Header with Hide Button */}
+              <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                    Itinerary Controls
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    (Detail level &amp; photo options)
+                  </span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-blue-900">
-                      Itinerary Photos
-                    </span>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      hasBodyPhotos ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {hasBodyPhotos ? `${totalBodyPhotos} photo${totalBodyPhotos === 1 ? '' : 's'} added` : 'No photos added'}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-blue-700/80">
-                    1-click photo controls for all itinerary days (front cover &amp; last page remain untouched)
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                {/* 1-Click Toggle Button */}
                 <button
                   type="button"
-                  onClick={handleToggleAllPhotos}
-                  disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 ${
-                    hasBodyPhotos
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
-                  }`}
-                  title={
-                    hasBodyPhotos
-                      ? 'Remove all photos from itinerary days in 1 click (preserves front and back pages)'
-                      : 'Add destination photos to all itinerary days in 1 click (preserves front and back pages)'
-                  }
+                  onClick={() => setIsControlsBarHidden(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors shadow-2xs"
+                  title="Hide these controls to view more document content"
                 >
-                  {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
-                  <span>{hasBodyPhotos ? 'Remove All Images' : 'Add All Images'}</span>
+                  <EyeOff size={12} className="text-gray-500" />
+                  <span>Hide Controls</span>
                 </button>
+              </div>
 
-                {/* Explicit buttons for instant 1-click add or remove anytime */}
-                {hasBodyPhotos ? (
+              {/* 3 Functional Detail Level Buttons: Low, Medium, High */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/70 p-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
+                    <Sliders size={15} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-indigo-900">
+                        Itinerary Detail Level
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
+                        {DETAIL_LEVEL_CONFIGS[currentDetailLevel].badgeText}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-indigo-700/80">
+                      Adjust document depth: Low (short &amp; sweet), Medium (current size), or High (extra advanced details)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center rounded-lg border border-indigo-200 bg-white p-0.5 shadow-2xs">
                   <button
                     type="button"
-                    onClick={() => handleAddPhotosToAllPages(true)}
-                    disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
-                    className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
-                    title="Refresh and re-match photos for all itinerary days"
+                    onClick={() => handleDetailLevelChange('low')}
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      currentDetailLevel === 'low'
+                        ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Low: Short & sweet, concise daily highlights for quick reading"
                   >
-                    <RefreshCw size={11} className={isMatchingImages ? 'animate-spin' : ''} />
-                    <span>Re-match All</span>
+                    <span>Low</span>
+                    <span className="hidden sm:inline text-[10px] opacity-80">(Short &amp; Sweet)</span>
                   </button>
-                ) : (
                   <button
                     type="button"
-                    onClick={handleAutoMatchImages}
-                    disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
-                    className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                    onClick={() => handleDetailLevelChange('medium')}
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      currentDetailLevel === 'medium'
+                        ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Medium: Current standard document size"
                   >
-                    <span>Auto-match</span>
+                    <span>Medium</span>
+                    <span className="hidden sm:inline text-[10px] opacity-80">(Current Size)</span>
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => handleDetailLevelChange('high')}
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                      currentDetailLevel === 'high'
+                        ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="High: Extra advanced details, timing guides & comprehensive context"
+                  >
+                    <span>High</span>
+                    <span className="hidden sm:inline text-[10px] opacity-80">(Extra Details)</span>
+                  </button>
+                </div>
               </div>
+              {detailStatus && (
+                <div className="flex items-center justify-between text-[10px] font-medium text-indigo-700 bg-indigo-50/70 px-2.5 py-1 rounded-md border border-indigo-100">
+                  <span>{detailStatus}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDetailStatus(null)}
+                    className="text-indigo-400 hover:text-indigo-700 font-bold ml-2 text-xs"
+                    title="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
+              {/* Itinerary Photos 1-Click Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-blue-700">
+                    <ImagePlus size={15} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-blue-900">
+                        Itinerary Photos
+                      </span>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        hasBodyPhotos ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {hasBodyPhotos ? `${totalBodyPhotos} photo${totalBodyPhotos === 1 ? '' : 's'} added` : 'No photos added'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-blue-700/80">
+                      1-click photo controls for all itinerary days (front cover &amp; last page remain untouched)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {/* 1-Click Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={handleToggleAllPhotos}
+                    disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 ${
+                      hasBodyPhotos
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                    }`}
+                    title={
+                      hasBodyPhotos
+                        ? 'Remove all photos from itinerary days in 1 click (preserves front and back pages)'
+                        : 'Add destination photos to all itinerary days in 1 click (preserves front and back pages)'
+                    }
+                  >
+                    {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
+                    <span>{hasBodyPhotos ? 'Remove All Images' : 'Add All Images'}</span>
+                  </button>
+
+                  {/* Explicit buttons for instant 1-click add or remove anytime */}
+                  {hasBodyPhotos ? (
+                    <button
+                      type="button"
+                      onClick={() => handleAddPhotosToAllPages(true)}
+                      disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
+                      className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                      title="Refresh and re-match photos for all itinerary days"
+                    >
+                      <RefreshCw size={11} className={isMatchingImages ? 'animate-spin' : ''} />
+                      <span>Re-match All</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleAutoMatchImages}
+                      disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
+                      className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                    >
+                      <span>Auto-match</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+              {imageStatus && (
+                <div className="flex items-center justify-between text-[10px] font-medium text-green-700 bg-green-50/70 px-2.5 py-1 rounded-md border border-green-100">
+                  <span>{imageStatus}</span>
+                  <button
+                    type="button"
+                    onClick={() => setImageStatus(null)}
+                    className="text-green-400 hover:text-green-700 font-bold ml-2 text-xs"
+                    title="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              {imageError && (
+                <div className="flex items-center justify-between text-[10px] font-medium text-red-600 bg-red-50/70 px-2.5 py-1 rounded-md border border-red-100">
+                  <span>{imageError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setImageError(null)}
+                    className="text-red-400 hover:text-red-700 font-bold ml-2 text-xs"
+                    title="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
-            {imageStatus && <p className="mt-1 text-[10px] font-medium text-green-700">{imageStatus}</p>}
-            {imageError && <p className="mt-1 text-[10px] font-medium text-red-600">{imageError}</p>}
-          </div>
+          )
         )}
         {viewMode === 'preview' ? (
           <DocumentPreview documentContent={documentContent} />

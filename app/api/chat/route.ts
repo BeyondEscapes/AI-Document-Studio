@@ -97,25 +97,32 @@ export async function POST(request: NextRequest) {
     const documentIntake = result.documentIntake
       ? mergeDocumentIntakes(result.isNewDocument ? undefined : previousIntake, result.documentIntake)
       : undefined
-    const missingFields = documentIntake ? getMissingRequiredFields(documentIntake) : []
+    const isItinerary = documentIntake?.documentType === 'tour_itinerary'
+    const missingFields = documentIntake
+      ? getMissingRequiredFields(documentIntake).filter(key =>
+          !(isItinerary && (key === 'clientName' || key === 'travelDates' || key === 'travelerCount' || key === 'tripDuration'))
+        )
+      : []
     let responseText = result.message
     let documentContent = result.documentContent
 
-    if (documentIntake && missingFields.length > 0) {
+    if (documentIntake && missingFields.length > 0 && !documentContent && !isItinerary) {
       const missingLabels = missingFields
         .map(key => getDocumentFieldLabel(documentIntake.documentType, key))
       responseText = `I've identified this as a ${documentIntake.documentType.replaceAll('_', ' ')}. To prepare it accurately, could you provide these missing details: ${missingLabels.join(', ')}?`
       documentContent = null
-    } else if (documentIntake && documentContent) {
+    } else if ((documentIntake || isItinerary) && documentContent) {
       documentContent = {
         ...documentContent,
-        documentType: documentIntake.documentType,
-        intake: documentIntake,
+        documentType: documentIntake?.documentType || 'tour_itinerary',
+        ...(documentIntake ? { intake: documentIntake } : {}),
         approval: { status: 'draft' },
       }
     } else if (documentContent) {
-      responseText = 'I could not identify and validate the document details. Please tell me which business document you need and provide its source details.'
-      documentContent = null
+      documentContent = {
+        ...documentContent,
+        approval: { status: 'draft' },
+      }
     }
 
     if (documentIntake) {

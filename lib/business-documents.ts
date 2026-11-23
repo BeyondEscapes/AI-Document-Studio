@@ -74,7 +74,7 @@ export const BUSINESS_DOCUMENT_TEMPLATES: Record<BusinessDocumentType, BusinessD
   tour_itinerary: {
     label: 'Tour Itinerary',
     summary: 'Day-by-day travel itinerary and route.',
-    requiredFields: ['tripDuration', 'destinations'],
+    requiredFields: ['destinations'],
     fields: [
       { key: 'clientName', label: 'Client Name' },
       { key: 'tripDuration', label: 'Trip Duration' },
@@ -234,7 +234,12 @@ function normalizeFieldValue(value: unknown): string {
 
 export function getMissingRequiredFields(intake: DocumentIntake): string[] {
   const template = BUSINESS_DOCUMENT_TEMPLATES[intake.documentType]
+  if (!template) return []
   return template.requiredFields.filter(key => {
+    // For tour itineraries, client name, travel dates, traveler count, and duration are never required to draft or review
+    if (intake.documentType === 'tour_itinerary' && (key === 'clientName' || key === 'travelDates' || key === 'travelerCount' || key === 'tripDuration')) {
+      return false
+    }
     const value = intake.fields[key]?.trim()
     return !value || /^(not provided|not specified|not stated|unknown)$/i.test(value)
   })
