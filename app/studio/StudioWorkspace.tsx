@@ -290,7 +290,7 @@ export default function StudioWorkspace({ userId, initialConversation, cloudDocu
   }, [])
 
   return (
-    <div className="studio-shell flex min-h-0 flex-1 overflow-hidden bg-gray-50">
+    <div className="studio-shell flex min-h-0 flex-1 overflow-hidden bg-ui-canvas">
       {/* Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -316,7 +316,7 @@ export default function StudioWorkspace({ userId, initialConversation, cloudDocu
       {/* Main Content */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Chat Panel */}
-        <div className={`flex-col ${isDocPanelOpen ? 'hidden lg:flex lg:w-[min(34vw,480px)]' : 'flex flex-1'} min-w-0 border-r border-gray-200`}>
+        <div className={`flex-col ${isDocPanelOpen ? 'hidden lg:flex lg:w-[min(34vw,480px)]' : 'flex flex-1'} min-w-0 border-r border-ui-line`}>
           <ChatPanel
             conversation={activeConversation}
             apiKeyConfigured={apiKeyConfigured}

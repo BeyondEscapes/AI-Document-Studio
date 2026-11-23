@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import {
   MessageSquarePlus, MessageSquare, Trash2, Settings, ChevronLeft,
   ChevronRight, FileText, Upload, Key, Check, X, AlertCircle,
@@ -93,23 +92,15 @@ export function Sidebar({
   }
 
   return (
-    <div className={`flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ${isOpen ? 'w-72' : 'w-14'} flex-shrink-0`}>
-      {/* Logo Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-100 h-14">
-        {isOpen && (
-          <div className="flex items-center gap-2 overflow-hidden">
-            <div className="w-7 h-7 relative flex-shrink-0">
-              <Image src="/images/beyond_escapes_icon.png" alt="Beyond Escapes" fill className="object-contain" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-800 truncate leading-tight">AI Document Studio</p>
-              <p className="text-[10px] text-gray-500 truncate leading-tight">Beyond Escapes</p>
-            </div>
-          </div>
-        )}
+    <div className={`flex flex-col bg-ui-panel border-r border-ui-line transition-[width] duration-300 ${isOpen ? 'w-72' : 'w-14'} flex-shrink-0`}>
+      <div className="flex items-center justify-between p-3 border-b border-ui-line h-14">
+        {isOpen && <span className="text-sm font-semibold text-ui-body">Workspace</span>}
         <button
+          type="button"
           onClick={onToggle}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
+          aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          aria-expanded={isOpen}
+          className="icon-button compact-icon"
         >
           {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>
@@ -119,22 +110,22 @@ export function Sidebar({
       <div className="p-2">
         <button
           onClick={onNewConversation}
-          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors ${!isOpen ? 'justify-center' : ''}`}
+          className={`primary-button w-full ${!isOpen ? 'button-square' : ''}`}
           title="New conversation"
         >
           <MessageSquarePlus size={16} />
-          {isOpen && <span>New Document</span>}
+          {isOpen && <span>New document</span>}
         </button>
       </div>
 
       {/* API Key Warning */}
       {!apiKeyConfigured && isOpen && (
-        <div className="mx-2 mb-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
+        <div className="mx-2 mb-2 p-2 rounded-lg bg-ui-warning-tint border border-ui-warning-tint">
           <div className="flex items-start gap-1.5">
-            <AlertCircle size={13} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <AlertCircle size={13} className="text-ui-warning mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs font-medium text-amber-800">API Key Missing</p>
-              <p className="text-xs text-amber-700 mt-0.5">Add GEMINI_API_KEY to .env.local</p>
+              <p className="text-xs font-medium text-ui-warning">API Key Missing</p>
+              <p className="text-xs text-ui-warning mt-0.5">Add GEMINI_API_KEY to .env.local</p>
             </div>
           </div>
         </div>
@@ -143,19 +134,19 @@ export function Sidebar({
       {/* Conversations List */}
       <div className="flex-1 overflow-y-auto py-1">
         {isOpen && (
-          <p className="px-3 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+          <p className="px-3 py-1.5 text-[11px] font-semibold text-ui-muted uppercase tracking-wider">
             Recent Conversations
           </p>
         )}
         {conversations.length === 0 && isOpen && (
           <div className="px-3 py-4 text-center">
-            <MessageSquare size={24} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-xs text-gray-400">No conversations yet</p>
-            <p className="text-xs text-gray-400">Start by creating a document</p>
+            <MessageSquare size={24} className="mx-auto text-ui-muted mb-2" />
+            <p className="text-xs text-ui-muted">No conversations yet</p>
+            <p className="text-xs text-ui-muted">Start by creating a document</p>
           </div>
         )}
         {openError && (
-          <div role="alert" className="mx-2 my-1 rounded-lg bg-red-50 p-2 text-xs text-red-700">
+          <div role="alert" className="mx-2 my-1 rounded-lg bg-ui-danger-tint p-2 text-xs text-ui-danger">
             {openError} <button type="button" onClick={onRetryOpen} className="underline">Retry</button>
           </div>
         )}
@@ -164,8 +155,8 @@ export function Sidebar({
             key={conv.id}
             className={`group flex items-center gap-1 mx-1 pr-2 rounded-lg transition-colors ${
               activeConversationId === conv.id
-                ? 'bg-blue-50 text-blue-700'
-                : 'hover:bg-gray-50 text-gray-700'
+                ? 'bg-ui-tint text-ui-accent'
+                : 'hover:bg-ui-canvas text-ui-muted'
             } ${deletingId === conv.id ? 'opacity-50 scale-95 transition-all' : ''}`}
           >
             <button type="button" title={conv.documentContent?.title || conv.title} aria-label={conv.documentContent?.title || conv.title}
@@ -179,7 +170,7 @@ export function Sidebar({
                 <FileText size={14} className="shrink-0" />}
               {isOpen && <span className="min-w-0">
                 <span className="block truncate text-xs font-medium">{conv.documentContent?.title || conv.title}</span>
-                <span className="block text-[10px] text-gray-400">
+                <span className="block text-[10px] text-ui-muted">
                   {openingId === conv.id ? 'Opening…' : formatDate(conv.updatedAt)}
                 </span>
               </span>}
@@ -189,7 +180,7 @@ export function Sidebar({
                   type="button"
                   aria-label={`Delete ${conv.title}`}
                   onClick={(e) => handleDelete(conv.id, e)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 hover:text-red-500 text-gray-400 transition-all"
+                  className="icon-button compact-icon danger-icon"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -199,13 +190,13 @@ export function Sidebar({
       </div>
 
       {/* Bottom Sections */}
-      <div className="border-t border-gray-100">
+      <div className="border-t border-ui-line">
         {/* Template Selector */}
         {isOpen && (
           <div className="p-2">
             <button
               onClick={() => setShowThemes(!showThemes)}
-              className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-50 text-sm text-gray-600 transition-colors"
+              className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-ui-canvas text-sm text-ui-muted transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Palette size={14} />
@@ -222,33 +213,33 @@ export function Sidebar({
                     onClick={() => onThemeChange(theme.id)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
                       selectedThemeId === theme.id
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'hover:bg-gray-50 text-gray-600'
+                        ? 'bg-ui-tint text-ui-accent font-medium'
+                        : 'hover:bg-ui-canvas text-ui-muted'
                     }`}
                   >
                     {selectedThemeId === theme.id && <Check size={10} className="flex-shrink-0" />}
                     {selectedThemeId !== theme.id && <div className="w-2.5 flex-shrink-0" />}
                     <span className="truncate">{theme.name}</span>
                     {theme.isDefault && (
-                      <span className="ml-auto flex-shrink-0 text-[9px] bg-blue-100 text-blue-600 px-1 rounded">Default</span>
+                      <span className="ml-auto flex-shrink-0 text-[9px] bg-ui-tint text-ui-accent px-1 rounded">Default</span>
                     )}
                   </button>
                 ))}
 
                 {/* Upload New Template */}
-                <div className="pt-2 border-t border-gray-100 mt-2">
-                  <p className="text-[10px] text-gray-400 mb-1 px-1">Upload custom template</p>
+                <div className="pt-2 border-t border-ui-line mt-2">
+                  <p className="text-[10px] text-ui-muted mb-1 px-1">Upload custom template</p>
                   <input
                     type="text"
                     placeholder="Template name"
                     value={themeName}
                     onChange={e => setThemeName(e.target.value)}
-                    className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 mb-1"
+                    className="w-full px-2 py-1 text-xs border border-ui-line rounded-lg focus:outline-none focus:ring-1 focus:ring-ui-accent mb-1"
                   />
                   <label className="block cursor-pointer">
-                    <div className="w-full flex items-center gap-1.5 px-2 py-1 border border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors">
-                      <Upload size={10} className="text-gray-400" />
-                      <span className="text-xs text-gray-500 truncate">
+                    <div className="w-full flex items-center gap-1.5 px-2 py-1 border border-dashed border-ui-line rounded-lg hover:border-ui-accent transition-colors">
+                      <Upload size={10} className="text-ui-muted" />
+                      <span className="text-xs text-ui-muted truncate">
                         {themeFile ? themeFile.name : 'Select .docx file'}
                       </span>
                     </div>
@@ -259,11 +250,11 @@ export function Sidebar({
                       onChange={e => setThemeFile(e.target.files?.[0] || null)}
                     />
                   </label>
-                  {uploadError && <p className="text-[10px] text-red-500 mt-1">{uploadError}</p>}
+                  {uploadError && <p className="text-[10px] text-ui-danger mt-1">{uploadError}</p>}
                   <button
                     onClick={handleThemeUpload}
                     disabled={uploadingTheme}
-                    className="w-full mt-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-white text-xs rounded-lg disabled:opacity-50 transition-colors"
+                    className="primary-button button-compact mt-1 w-full"
                   >
                     {uploadingTheme ? 'Uploading...' : 'Upload Template'}
                   </button>
@@ -275,10 +266,10 @@ export function Sidebar({
 
         {/* Settings */}
         {isOpen && (
-          <div className="p-2 border-t border-gray-100">
+          <div className="p-2 border-t border-ui-line">
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-50 text-sm text-gray-600 transition-colors"
+              className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-ui-canvas text-sm text-ui-muted transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Settings size={14} />
@@ -290,27 +281,27 @@ export function Sidebar({
             {showSettings && (
               <div className="mt-1 space-y-2 px-1">
                 <div>
-                  <p className="text-[10px] font-medium text-gray-500 mb-1 flex items-center gap-1">
+                  <p className="text-[10px] font-medium text-ui-muted mb-1 flex items-center gap-1">
                     <Key size={9} />
                     API Key Status
                   </p>
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs ${apiKeyConfigured ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs ${apiKeyConfigured ? 'bg-ui-tint text-ui-accent' : 'bg-ui-danger-tint text-ui-danger'}`}>
                     {apiKeyConfigured ? <Check size={10} /> : <X size={10} />}
                     {apiKeyConfigured ? 'Gemini API key configured' : 'API key not set'}
                   </div>
                   {!apiKeyConfigured && (
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      Edit <code className="bg-gray-100 px-0.5 rounded">.env.local</code> and add your GEMINI_API_KEY
+                    <p className="text-[10px] text-ui-muted mt-1">
+                      Edit <code className="bg-ui-subtle px-0.5 rounded">.env.local</code> and add your GEMINI_API_KEY
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-medium text-gray-500 mb-1">AI Model</p>
+                  <p className="text-[10px] font-medium text-ui-muted mb-1">AI Model</p>
                   <select
                     value={settings?.geminiModel || 'gemini-3.1-flash-lite'}
                     onChange={e => onSettingsUpdate({ geminiModel: e.target.value })}
-                    className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className="w-full px-2 py-1 text-xs border border-ui-line rounded-lg focus:outline-none focus:ring-1 focus:ring-ui-accent"
                   >
                     <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Ultra Fast ~1.7s - Recommended)</option>
                     <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (Fast)</option>
@@ -320,11 +311,11 @@ export function Sidebar({
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-medium text-gray-500 mb-1">Default Language</p>
+                  <p className="text-[10px] font-medium text-ui-muted mb-1">Default Language</p>
                   <select
                     value={settings?.language || 'English'}
                     onChange={e => onSettingsUpdate({ language: e.target.value })}
-                    className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className="w-full px-2 py-1 text-xs border border-ui-line rounded-lg focus:outline-none focus:ring-1 focus:ring-ui-accent"
                   >
                     <option value="English">English</option>
                     <option value="Sinhala">Sinhala</option>
@@ -342,7 +333,7 @@ export function Sidebar({
         {/* Collapsed icons */}
         {!isOpen && (
           <div className="flex flex-col items-center gap-1 p-2">
-            <button onClick={() => { onToggle(); setShowSettings(true) }} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500" title="Settings">
+            <button onClick={() => { onToggle(); setShowSettings(true) }} className="p-2 rounded-lg hover:bg-ui-subtle text-ui-muted" title="Settings">
               <Settings size={16} />
             </button>
           </div>

@@ -583,10 +583,10 @@ export function DocumentWorkspace({
 
   if (!documentContent) {
     return (
-      <div className="flex flex-col h-full bg-gray-50 items-center justify-center p-8">
-        <FileText size={40} className="text-gray-300 mb-3" />
-        <h3 className="text-sm font-medium text-gray-500">No document generated yet</h3>
-        <p className="text-xs text-gray-400 mt-1 text-center">
+      <div className="flex flex-col h-full bg-ui-canvas items-center justify-center p-8">
+        <FileText size={40} className="text-ui-muted mb-3" />
+        <h3 className="text-sm font-medium text-ui-muted">No document generated yet</h3>
+        <p className="text-xs text-ui-muted mt-1 text-center">
           Chat with AI to generate your document content
         </p>
       </div>
@@ -594,20 +594,20 @@ export function DocumentWorkspace({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white">
+    <div className="flex flex-col h-full min-h-0 bg-ui-panel">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 h-14">
-        <FileText size={15} className="text-blue-500 flex-shrink-0" />
-        <h2 className="text-sm font-semibold text-gray-800 flex-1 truncate">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-ui-line h-14">
+        <FileText size={15} className="text-ui-accent flex-shrink-0" />
+        <h2 className="text-sm font-semibold text-ui-body flex-1 truncate">
           {documentContent.title}
         </h2>
 
         {/* View Mode Toggle */}
-        <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+        <div className="flex items-center bg-ui-subtle rounded-lg p-0.5">
           <button
             onClick={() => setViewMode('preview')}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              viewMode === 'preview' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              viewMode === 'preview' ? 'bg-ui-panel text-ui-body shadow-sm' : 'text-ui-muted hover:text-ui-muted'
             }`}
           >
             <Eye size={12} />
@@ -616,7 +616,7 @@ export function DocumentWorkspace({
           <button
             onClick={() => setViewMode('edit')}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              viewMode === 'edit' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              viewMode === 'edit' ? 'bg-ui-panel text-ui-body shadow-sm' : 'text-ui-muted hover:text-ui-muted'
             }`}
           >
             <Edit3 size={12} />
@@ -632,8 +632,8 @@ export function DocumentWorkspace({
               onClick={() => setIsControlsBarHidden(prev => !prev)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                 isControlsBarHidden
-                  ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
+                  ? 'bg-ui-tint text-ui-accent hover:bg-ui-tint border-ui-line'
+                  : 'bg-ui-subtle text-ui-muted hover:bg-ui-subtle border-ui-line'
               }`}
               title={isControlsBarHidden ? 'Show itinerary controls' : 'Hide itinerary controls'}
             >
@@ -648,7 +648,7 @@ export function DocumentWorkspace({
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs active:scale-95 ${
                 hasBodyPhotos
                   ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:text-rose-800'
-                  : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                  : 'bg-ui-action text-white hover:bg-ui-action-hover disabled:opacity-50'
               }`}
               title={
                 hasBodyPhotos
@@ -664,25 +664,25 @@ export function DocumentWorkspace({
 
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-ui-subtle text-ui-muted hover:text-ui-muted transition-colors"
         >
           <X size={15} />
         </button>
       </div>
 
       {/* Template Selector */}
-      <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-        <Palette size={12} className="text-gray-400 flex-shrink-0" />
-        <span className="text-xs text-gray-500">Template:</span>
+      <div className="px-4 py-2 border-b border-ui-line bg-ui-canvas flex items-center gap-2">
+        <Palette size={12} className="text-ui-muted flex-shrink-0" />
+        <span className="text-xs text-ui-muted">Template:</span>
         {isItinerary ? (
-          <span className="text-xs font-medium text-gray-700">
-            Beyond Escapes Official <span className="font-normal text-gray-400">(fixed for itinerary branding)</span>
+          <span className="text-xs font-medium text-ui-muted">
+            Beyond Escapes Official <span className="font-normal text-ui-muted">(fixed for itinerary branding)</span>
           </span>
         ) : (
           <select
             value={selectedThemeId}
             onChange={e => onThemeChange(e.target.value)}
-            className="text-xs border-0 bg-transparent text-gray-700 font-medium focus:outline-none cursor-pointer flex-1 max-w-xs"
+            className="text-xs border-0 bg-transparent text-ui-muted font-medium focus:outline-none cursor-pointer flex-1 max-w-xs"
           >
             {themes.map(theme => (
               <option key={theme.id} value={theme.id}>{theme.name}</option>
@@ -696,17 +696,17 @@ export function DocumentWorkspace({
         {isItinerary && (
           isControlsBarHidden ? (
             /* Collapsed / Hidden Toolbar View */
-            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-4 py-2 backdrop-blur-sm shadow-xs flex items-center justify-between gap-2">
+            <div className="sticky top-0 z-10 border-b border-ui-line bg-ui-panel/95 px-4 py-2 backdrop-blur-sm shadow-xs flex items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="font-semibold text-gray-700 flex items-center gap-1.5">
-                  <Sliders size={13} className="text-indigo-600" />
+                <span className="font-semibold text-ui-muted flex items-center gap-1.5">
+                  <Sliders size={13} className="text-ui-accent" />
                   Itinerary Controls
                 </span>
-                <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 border border-indigo-100">
+                <span className="inline-flex items-center rounded-full bg-ui-tint px-2 py-0.5 text-[10px] font-medium text-ui-accent border border-ui-line">
                   Detail: {DETAIL_LEVEL_CONFIGS[currentDetailLevel].label}
                 </span>
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border ${
-                  hasBodyPhotos ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-600 border-gray-200'
+                  hasBodyPhotos ? 'bg-ui-tint text-ui-accent border-ui-line' : 'bg-ui-canvas text-ui-muted border-ui-line'
                 }`}>
                   Photos: {hasBodyPhotos ? `${totalBodyPhotos} added` : 'None'}
                 </span>
@@ -714,7 +714,7 @@ export function DocumentWorkspace({
               <button
                 type="button"
                 onClick={() => setIsControlsBarHidden(false)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-md border border-ui-line bg-ui-tint px-2.5 py-1 text-xs font-semibold text-ui-accent hover:bg-ui-tint transition-colors shadow-2xs"
                 title="Show Detail Level and Photo controls"
               >
                 <Eye size={12} />
@@ -723,57 +723,57 @@ export function DocumentWorkspace({
             </div>
           ) : (
             /* Full Expanded Controls View */
-            <div className="sticky top-0 z-10 border-b border-blue-100 bg-white/95 px-4 py-2.5 backdrop-blur-sm shadow-xs space-y-2">
+            <div className="sticky top-0 z-10 border-b border-ui-line bg-ui-panel/95 px-4 py-2.5 backdrop-blur-sm shadow-xs space-y-2">
               {/* Controls Header with Hide Button */}
-              <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <div className="flex items-center justify-between pb-1 border-b border-ui-line">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ui-muted">
                     Itinerary Controls
                   </span>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-ui-muted">
                     (Detail level &amp; photo options)
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsControlsBarHidden(true)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-ui-line bg-ui-panel px-2.5 py-1 text-xs font-medium text-ui-muted hover:bg-ui-subtle hover:text-ui-body transition-colors shadow-2xs"
                   title="Hide these controls to view more document content"
                 >
-                  <EyeOff size={12} className="text-gray-500" />
+                  <EyeOff size={12} className="text-ui-muted" />
                   <span>Hide Controls</span>
                 </button>
               </div>
 
               {/* 3 Functional Detail Level Buttons: Low, Medium, High */}
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50/70 p-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ui-line bg-ui-tint/70 p-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-ui-tint text-ui-accent">
                     <Sliders size={15} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-indigo-900">
+                      <span className="text-xs font-semibold text-ui-accent">
                         Itinerary Detail Level
                       </span>
-                      <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-800">
+                      <span className="inline-flex items-center rounded-full bg-ui-tint px-2 py-0.5 text-[10px] font-medium text-ui-accent">
                         {DETAIL_LEVEL_CONFIGS[currentDetailLevel].badgeText}
                       </span>
                     </div>
-                    <p className="text-[10px] text-indigo-700/80">
+                    <p className="text-[10px] text-ui-accent/80">
                       Adjust document depth: Low (short &amp; sweet), Medium (current size), or High (extra advanced details)
                     </p>
                   </div>
                 </div>
 
-                <div className="inline-flex items-center rounded-lg border border-indigo-200 bg-white p-0.5 shadow-2xs">
+                <div className="inline-flex items-center rounded-lg border border-ui-line bg-ui-panel p-0.5 shadow-2xs">
                   <button
                     type="button"
                     onClick={() => handleDetailLevelChange('low')}
                     className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
                       currentDetailLevel === 'low'
-                        ? 'bg-indigo-600 text-white shadow-xs font-semibold'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'bg-ui-action text-white shadow-xs font-semibold'
+                        : 'text-ui-muted hover:bg-ui-subtle'
                     }`}
                     title="Low: Short & sweet, concise daily highlights for quick reading"
                   >
@@ -785,8 +785,8 @@ export function DocumentWorkspace({
                     onClick={() => handleDetailLevelChange('medium')}
                     className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
                       currentDetailLevel === 'medium'
-                        ? 'bg-indigo-600 text-white shadow-xs font-semibold'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'bg-ui-action text-white shadow-xs font-semibold'
+                        : 'text-ui-muted hover:bg-ui-subtle'
                     }`}
                     title="Medium: Current standard document size"
                   >
@@ -798,8 +798,8 @@ export function DocumentWorkspace({
                     onClick={() => handleDetailLevelChange('high')}
                     className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
                       currentDetailLevel === 'high'
-                        ? 'bg-indigo-600 text-white shadow-xs font-semibold'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'bg-ui-action text-white shadow-xs font-semibold'
+                        : 'text-ui-muted hover:bg-ui-subtle'
                     }`}
                     title="High: Extra advanced details, timing guides & comprehensive context"
                   >
@@ -809,12 +809,12 @@ export function DocumentWorkspace({
                 </div>
               </div>
               {detailStatus && (
-                <div className="flex items-center justify-between text-[10px] font-medium text-indigo-700 bg-indigo-50/70 px-2.5 py-1 rounded-md border border-indigo-100">
+                <div className="flex items-center justify-between text-[10px] font-medium text-ui-accent bg-ui-tint/70 px-2.5 py-1 rounded-md border border-ui-line">
                   <span>{detailStatus}</span>
                   <button
                     type="button"
                     onClick={() => setDetailStatus(null)}
-                    className="text-indigo-400 hover:text-indigo-700 font-bold ml-2 text-xs"
+                    className="text-ui-accent hover:text-ui-accent font-bold ml-2 text-xs"
                     title="Dismiss"
                   >
                     ×
@@ -823,23 +823,23 @@ export function DocumentWorkspace({
               )}
 
               {/* Itinerary Photos 1-Click Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/70 p-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ui-line bg-ui-tint/70 p-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-blue-700">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-ui-tint text-ui-accent">
                     <ImagePlus size={15} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-blue-900">
+                      <span className="text-xs font-semibold text-ui-accent">
                         Itinerary Photos
                       </span>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        hasBodyPhotos ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                        hasBodyPhotos ? 'bg-ui-tint text-ui-accent' : 'bg-ui-subtle text-ui-muted'
                       }`}>
                         {hasBodyPhotos ? `${totalBodyPhotos} photo${totalBodyPhotos === 1 ? '' : 's'} added` : 'No photos added'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-blue-700/80">
+                    <p className="text-[10px] text-ui-accent/80">
                       1-click photo controls for all itinerary days (front cover &amp; last page remain untouched)
                     </p>
                   </div>
@@ -853,8 +853,8 @@ export function DocumentWorkspace({
                     disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
                     className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 ${
                       hasBodyPhotos
-                        ? 'bg-red-600 text-white hover:bg-red-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+                        ? 'bg-ui-danger-action text-white hover:bg-ui-danger-hover'
+                        : 'bg-ui-action text-white hover:bg-ui-action-hover disabled:opacity-50'
                     }`}
                     title={
                       hasBodyPhotos
@@ -872,7 +872,7 @@ export function DocumentWorkspace({
                       type="button"
                       onClick={() => handleAddPhotosToAllPages(true)}
                       disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
-                      className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                      className="inline-flex items-center gap-1 rounded-md border border-ui-line bg-ui-panel px-2.5 py-1.5 text-[11px] font-medium text-ui-accent hover:bg-ui-tint"
                       title="Refresh and re-match photos for all itinerary days"
                     >
                       <RefreshCw size={11} className={isMatchingImages ? 'animate-spin' : ''} />
@@ -883,7 +883,7 @@ export function DocumentWorkspace({
                       type="button"
                       onClick={handleAutoMatchImages}
                       disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
-                      className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                      className="inline-flex items-center gap-1 rounded-md border border-ui-line bg-ui-panel px-2.5 py-1.5 text-[11px] font-medium text-ui-accent hover:bg-ui-tint"
                     >
                       <span>Auto-match</span>
                     </button>
@@ -891,12 +891,12 @@ export function DocumentWorkspace({
                 </div>
               </div>
               {imageStatus && (
-                <div className="flex items-center justify-between text-[10px] font-medium text-green-700 bg-green-50/70 px-2.5 py-1 rounded-md border border-green-100">
+                <div className="flex items-center justify-between text-[10px] font-medium text-ui-accent bg-ui-tint/70 px-2.5 py-1 rounded-md border border-ui-line">
                   <span>{imageStatus}</span>
                   <button
                     type="button"
                     onClick={() => setImageStatus(null)}
-                    className="text-green-400 hover:text-green-700 font-bold ml-2 text-xs"
+                    className="text-ui-accent hover:text-ui-accent font-bold ml-2 text-xs"
                     title="Dismiss"
                   >
                     ×
@@ -904,12 +904,12 @@ export function DocumentWorkspace({
                 </div>
               )}
               {imageError && (
-                <div className="flex items-center justify-between text-[10px] font-medium text-red-600 bg-red-50/70 px-2.5 py-1 rounded-md border border-red-100">
+                <div className="flex items-center justify-between text-[10px] font-medium text-ui-danger bg-ui-danger-tint/70 px-2.5 py-1 rounded-md border border-ui-danger-tint">
                   <span>{imageError}</span>
                   <button
                     type="button"
                     onClick={() => setImageError(null)}
-                    className="text-red-400 hover:text-red-700 font-bold ml-2 text-xs"
+                    className="text-ui-danger hover:text-ui-danger font-bold ml-2 text-xs"
                     title="Dismiss"
                   >
                     ×
@@ -942,12 +942,12 @@ export function DocumentWorkspace({
       </div>
 
       {/* Export Panel */}
-      <div className="shrink-0 max-h-[35vh] overflow-y-auto border-t border-gray-200 px-4 py-3 bg-white">
+      <div className="shrink-0 max-h-[35vh] overflow-y-auto border-t border-ui-line px-4 py-3 bg-ui-panel">
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={handleSave}
             disabled={saveStatus === 'saving'}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            className="secondary-button button-compact flex-1"
           >
             {saveStatus === 'saving' ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             {saveStatus === 'saving' ? 'Saving...' : 'Save document'}
@@ -955,10 +955,10 @@ export function DocumentWorkspace({
           <button
             onClick={handleApprovalToggle}
             disabled={documentContent.approval?.status !== 'approved' && missingRequiredFields.length > 0}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-50 ${
+            className={`button-compact flex-1 ${
               documentContent.approval?.status === 'approved'
-                ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                ? 'secondary-button'
+                : 'primary-button'
             }`}
           >
             <BadgeCheck size={14} />
@@ -966,40 +966,40 @@ export function DocumentWorkspace({
           </button>
         </div>
         <div className="flex items-center justify-between mb-2 text-[10px]">
-          <span className={saveStatus === 'error' ? 'text-red-600' : 'text-gray-400'}>
+          <span className={saveStatus === 'error' ? 'text-ui-danger' : 'text-ui-muted'}>
             {saveStatus === 'error'
-              ? saveError || manualSaveError || 'Local save failed. Retry to save.'
+              ? saveError || manualSaveError || 'Could not save. Try saving again.'
               : saveStatus === 'saving'
                 ? 'Saving changes...'
                 : saveStatus === 'saved'
                   ? (cloudDocuments ? 'Saved to MongoDB' : 'Saved on this server')
-                  : 'Changes save to this device'}
+                  : 'Changes save automatically'}
           </span>
-          <span className={documentContent.approval?.status === 'approved' ? 'text-green-700' : 'text-amber-700'}>
-            {documentContent.approval?.status === 'approved' ? 'Approved' : 'Draft - not approved'}
+          <span className={`status-pill ${documentContent.approval?.status === 'approved' ? 'status-approved' : ''}`}>
+            {documentContent.approval?.status === 'approved' ? 'Approved' : 'Draft'}
           </span>
         </div>
         {missingRequiredFields.length > 0 && (
-          <p className="text-[10px] text-amber-700 mb-2">
+          <p className="text-[10px] text-ui-warning mb-2">
             Complete these required fields before approval: {missingRequiredFields
               .map(key => getDocumentFieldLabel(documentContent.intake!.documentType, key))
               .join(', ')}
           </p>
         )}
-        <p className="text-xs font-semibold text-gray-600 mb-2">Export Document</p>
+        <p className="text-xs font-semibold text-ui-muted mb-2">Export Document</p>
         <div className="flex gap-2">
           {/* DOCX Button */}
           <div className="flex-1">
             <button
               onClick={() => handleExport('docx')}
               disabled={exportStatus.docx === 'loading'}
-              className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              className={`w-full ${
                 exportStatus.docx === 'success'
-                  ? 'bg-green-500 text-white'
+                  ? 'secondary-button'
                   : exportStatus.docx === 'error'
-                  ? 'bg-red-50 border border-red-200 text-red-600'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              } disabled:opacity-60`}
+                  ? 'secondary-button button-error'
+                  : 'primary-button'
+              }`}
             >
               {exportStatus.docx === 'loading' ? (
                 <Loader2 size={15} className="animate-spin" />
@@ -1018,7 +1018,7 @@ export function DocumentWorkspace({
               </span>
             </button>
             {exportStatus.docx === 'error' && exportStatus.docxError && (
-              <p className="text-[10px] text-red-500 mt-1 text-center">{exportStatus.docxError}</p>
+              <p className="text-[10px] text-ui-danger mt-1 text-center">{exportStatus.docxError}</p>
             )}
           </div>
 
@@ -1027,13 +1027,7 @@ export function DocumentWorkspace({
             <button
               onClick={() => handleExport('pdf')}
               disabled={exportStatus.pdf === 'loading'}
-              className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                exportStatus.pdf === 'success'
-                  ? 'bg-green-500 text-white'
-                  : exportStatus.pdf === 'error'
-                  ? 'bg-red-50 border border-red-200 text-red-600'
-                  : 'bg-gray-700 hover:bg-gray-800 text-white'
-              } disabled:opacity-60`}
+              className={`secondary-button w-full ${exportStatus.pdf === 'error' ? 'button-error' : ''}`}
             >
               {exportStatus.pdf === 'loading' ? (
                 <Loader2 size={15} className="animate-spin" />
@@ -1052,13 +1046,13 @@ export function DocumentWorkspace({
               </span>
             </button>
             {exportStatus.pdf === 'error' && exportStatus.pdfError && (
-              <p className="text-[10px] text-red-500 mt-1 text-center">{exportStatus.pdfError}</p>
+              <p className="text-[10px] text-ui-danger mt-1 text-center">{exportStatus.pdfError}</p>
             )}
           </div>
         </div>
 
         {/* LibreOffice note */}
-        <p className="text-[10px] text-gray-400 mt-2 text-center">
+        <p className="text-[10px] text-ui-muted mt-2 text-center">
           PDF requires LibreOffice • DOCX uses Beyond Escapes template
         </p>
       </div>
@@ -1672,13 +1666,13 @@ function DocumentEditor({
       )}
 
       {/* Title Editor */}
-      <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
-        <span className="text-[10px] text-gray-400 uppercase tracking-wider mt-1 w-14 flex-shrink-0">Title</span>
+      <div className="flex items-start gap-2 p-3 bg-ui-canvas rounded-xl border border-ui-line">
+        <span className="text-[10px] text-ui-muted uppercase tracking-wider mt-1 w-14 flex-shrink-0">Title</span>
         <input
           type="text"
           value={documentContent.title}
           onChange={e => onTitleChange(e.target.value)}
-          className="flex-1 bg-transparent text-sm font-semibold text-gray-900 outline-none focus:ring-0"
+          className="flex-1 bg-transparent text-sm font-semibold text-ui-body outline-none focus:ring-0"
           placeholder="Document title"
         />
       </div>
@@ -1739,38 +1733,38 @@ function ItineraryPagesEditor({
   const routeStops = cover.routeStops ?? getInitialRouteStops(routeText)
 
   return (
-    <section className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+    <section className="space-y-3 rounded-xl border border-ui-line bg-ui-tint/40 p-3">
       <div>
-        <h3 className="text-xs font-semibold text-blue-900">Cover & final page editor</h3>
-        <p className="text-[10px] text-blue-700">These fields stay editable in Word. Artwork and maps are images only.</p>
+        <h3 className="text-xs font-semibold text-ui-accent">Cover & final page editor</h3>
+        <p className="text-[10px] text-ui-accent">These fields stay editable in Word. Artwork and maps are images only.</p>
       </div>
 
-      <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
-        <h4 className="text-[11px] font-semibold text-gray-800">First page</h4>
+      <div className="space-y-2 rounded-lg border border-ui-line bg-ui-panel p-3">
+        <h4 className="text-[11px] font-semibold text-ui-body">First page</h4>
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">Journey overview</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Journey overview</span>
           <textarea
             value={pageContent.overview}
             onChange={event => onCoverPageUpdate({ overview: event.target.value })}
             rows={4}
-            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">Ayubowan welcome message</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Ayubowan welcome message</span>
           <textarea
             value={pageContent.welcome}
             onChange={event => onCoverPageUpdate({ welcome: event.target.value })}
             rows={3}
-            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">Prepared by</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Prepared by</span>
           <input
             value={cover.preparedBy ?? pageContent.preparedBy}
             onChange={event => onCoverPageUpdate({ preparedBy: event.target.value })}
-            className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
           />
         </label>
 
@@ -1783,22 +1777,22 @@ function ItineraryPagesEditor({
         />
         {cover.mapImage && (
           <label className="block">
-            <span className="mb-1 block text-[10px] font-medium text-gray-600">Map attribution / source</span>
+            <span className="mb-1 block text-[10px] font-medium text-ui-muted">Map attribution / source</span>
             <input
               value={cover.mapAttribution ?? ''}
               onChange={event => onCoverPageUpdate({ mapAttribution: event.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
             />
           </label>
         )}
       </div>
 
-      <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-3">
-        <h4 className="text-[11px] font-semibold text-gray-800">Quotation &amp; Closing Page</h4>
+      <div className="space-y-3 rounded-lg border border-ui-line bg-ui-panel p-3">
+        <h4 className="text-[11px] font-semibold text-ui-body">Quotation &amp; Closing Page</h4>
 
         {/* Quotation Editor */}
-        <div className="space-y-2 rounded border border-gray-100 bg-gray-50/50 p-2">
-          <span className="block text-[10px] font-semibold text-gray-700">Quotation (one per line: Service | Amount)</span>
+        <div className="space-y-2 rounded border border-ui-line bg-ui-canvas/50 p-2">
+          <span className="block text-[10px] font-semibold text-ui-muted">Quotation (one per line: Service | Amount)</span>
           <textarea
             value={pageContent.quotation.items.map(it => `${it.service} | ${it.amount}`).join('\n')}
             onChange={event => {
@@ -1814,11 +1808,11 @@ function ItineraryPagesEditor({
               })
             }}
             rows={3}
-            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line bg-ui-panel px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
             placeholder="Per vehicle per tour | USD 760.00"
           />
           <label className="block">
-            <span className="mb-0.5 block text-[9px] font-medium text-gray-600">Total Amount</span>
+            <span className="mb-0.5 block text-[9px] font-medium text-ui-muted">Total Amount</span>
             <input
               value={closing.quotation?.total ?? pageContent.quotation.total}
               onChange={event => onClosingPageUpdate({
@@ -1827,7 +1821,7 @@ function ItineraryPagesEditor({
                   total: event.target.value,
                 },
               })}
-              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-800 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-ui-line bg-ui-panel px-2 py-1 text-xs text-ui-body outline-none focus:border-ui-accent"
               placeholder="USD 920.00"
             />
           </label>
@@ -1835,7 +1829,7 @@ function ItineraryPagesEditor({
 
         {/* Optional Entrance Fees */}
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">Optional - Entrance fees (one per line: Attraction | Amount)</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Optional - Entrance fees (one per line: Attraction | Amount)</span>
           <textarea
             value={pageContent.optionalEntranceFees.map(it => `${it.attraction} | ${it.amount}`).join('\n')}
             onChange={event => onClosingPageUpdate({
@@ -1845,60 +1839,60 @@ function ItineraryPagesEditor({
               }).filter(it => it.attraction || it.amount),
             })}
             rows={4}
-            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
             placeholder="Dambulla Cave Temple | USD 10.00"
           />
         </label>
 
         {/* Value Added Services */}
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">Value added services on complementary basis (one item per line)</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Value added services on complementary basis (one item per line)</span>
           <textarea
             value={pageContent.valueAddedServices.join('\n')}
             onChange={event => onClosingPageUpdate({
               valueAddedServices: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
             })}
             rows={3}
-            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
           />
         </label>
 
         {/* Above Rate Includes */}
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">Above rate includes (one item per line)</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Above rate includes (one item per line)</span>
           <textarea
             value={pageContent.rateIncludes.join('\n')}
             onChange={event => onClosingPageUpdate({
               rateIncludes: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
             })}
             rows={4}
-            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
           />
         </label>
 
         {/* The Above Rate Excludes */}
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">The above rate excludes (one item per line)</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">The above rate excludes (one item per line)</span>
           <textarea
             value={pageContent.rateExcludes.join('\n')}
             onChange={event => onClosingPageUpdate({
               rateExcludes: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
             })}
             rows={4}
-            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
           />
         </label>
 
         {/* Cancellation Policy */}
         <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-gray-600">Cancellation policy (one term per line)</span>
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Cancellation policy (one term per line)</span>
           <textarea
             value={pageContent.cancellationPolicy.join('\n')}
             onChange={event => onClosingPageUpdate({
               cancellationPolicy: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
             })}
             rows={4}
-            className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
           />
         </label>
 
@@ -1911,12 +1905,12 @@ function ItineraryPagesEditor({
             ['address', 'Address', pageContent.address],
           ] as const).map(([key, label, value]) => (
             <label key={key} className="block">
-              <span className="mb-1 block text-[10px] font-medium text-gray-600">{label}</span>
+              <span className="mb-1 block text-[10px] font-medium text-ui-muted">{label}</span>
               <textarea
                 value={value}
                 onChange={event => onClosingPageUpdate({ [key]: event.target.value })}
                 rows={key === 'address' ? 2 : 1}
-                className="w-full resize-y rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+                className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
               />
             </label>
           ))}
@@ -1938,28 +1932,28 @@ function StructuredFieldsEditor({
   const fields = template.fields.filter(field => requiredKeys.has(field.key) || intake.fields[field.key]?.trim())
 
   return (
-    <section className="p-3 bg-blue-50/60 rounded-xl border border-blue-100">
+    <section className="p-3 bg-ui-tint/60 rounded-xl border border-ui-line">
       <div className="mb-2">
-        <h3 className="text-xs font-semibold text-blue-900">Extracted {template.label} details</h3>
-        <p className="text-[10px] text-blue-700">Edit these structured fields before approval or export.</p>
+        <h3 className="text-xs font-semibold text-ui-accent">Extracted {template.label} details</h3>
+        <p className="text-[10px] text-ui-accent">Edit these structured fields before approval or export.</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {fields.map(field => (
           <label key={field.key} className="block">
-            <span className="block text-[10px] font-medium text-gray-600 mb-1">
+            <span className="block text-[10px] font-medium text-ui-muted mb-1">
               {field.label}{requiredKeys.has(field.key) ? ' *' : ''}
             </span>
             <textarea
               value={intake.fields[field.key] || ''}
               onChange={event => onFieldUpdate(field.key, event.target.value)}
               rows={field.key === 'keyPoints' || field.key === 'lineItems' || field.key === 'remarks' ? 3 : 1}
-              className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-800 outline-none focus:border-blue-400"
+              className="w-full resize-y rounded-lg border border-ui-line bg-ui-panel px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
             />
           </label>
         ))}
       </div>
       {intake.missingFields.length > 0 && (
-        <p className="mt-2 text-[10px] text-amber-700">
+        <p className="mt-2 text-[10px] text-ui-warning">
           Required details still missing: {intake.missingFields
             .map(key => getDocumentFieldLabel(intake.documentType, key))
             .join(', ')}
@@ -1992,16 +1986,16 @@ function SectionEditor({
 }) {
   const [showAdd, setShowAdd] = useState(false)
   const typeBadgeColor = {
-    title: 'bg-purple-100 text-purple-700',
-    heading1: 'bg-blue-100 text-blue-700',
-    heading2: 'bg-blue-50 text-blue-600',
+    title: 'bg-ui-tint text-ui-accent',
+    heading1: 'bg-ui-tint text-ui-accent',
+    heading2: 'bg-ui-tint text-ui-accent',
     heading3: 'bg-sky-50 text-sky-600',
-    paragraph: 'bg-gray-100 text-gray-600',
-    bullet_list: 'bg-green-50 text-green-600',
+    paragraph: 'bg-ui-subtle text-ui-muted',
+    bullet_list: 'bg-ui-tint text-ui-accent',
     numbered_list: 'bg-teal-50 text-teal-600',
-    table: 'bg-orange-50 text-orange-600',
-    page_break: 'bg-red-50 text-red-500',
-  }[section.type] || 'bg-gray-100 text-gray-600'
+    table: 'bg-ui-warning-tint text-ui-warning',
+    page_break: 'bg-ui-danger-tint text-ui-danger',
+  }[section.type] || 'bg-ui-subtle text-ui-muted'
 
   const updateItems = (itemsText: string) => {
     const items = itemsText.split('\n').filter(l => l.trim())
@@ -2010,7 +2004,7 @@ function SectionEditor({
 
   return (
     <div className="group relative">
-      <div className="p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-200 transition-colors">
+      <div className="p-3 bg-ui-panel border border-ui-line rounded-xl hover:border-ui-line transition-colors">
         <div className="flex items-center gap-2 mb-2">
           <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${typeBadgeColor}`}>
             {section.type.replace('_', ' ')}
@@ -2018,14 +2012,14 @@ function SectionEditor({
           <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => setShowAdd(!showAdd)}
-              className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+              className="p-1 rounded hover:bg-ui-subtle text-ui-muted hover:text-ui-muted"
               title="Add section below"
             >
               <Plus size={12} />
             </button>
             <button
               onClick={onDelete}
-              className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
+              className="p-1 rounded hover:bg-ui-danger-tint text-ui-muted hover:text-ui-danger"
               title="Delete section"
             >
               <Trash2 size={12} />
@@ -2035,30 +2029,30 @@ function SectionEditor({
 
         {/* Content based on type */}
         {section.type === 'page_break' ? (
-          <div className="text-xs text-gray-400 italic text-center py-1">— Page Break —</div>
+          <div className="text-xs text-ui-muted italic text-center py-1">— Page Break —</div>
         ) : section.type === 'bullet_list' || section.type === 'numbered_list' ? (
           <textarea
             value={(section.items || []).join('\n')}
             onChange={e => updateItems(e.target.value)}
-            className="w-full text-sm text-gray-800 outline-none resize-none bg-transparent min-h-[60px]"
+            className="w-full text-sm text-ui-body outline-none resize-none bg-transparent min-h-[60px]"
             placeholder="One item per line"
           />
         ) : section.type === 'table' ? (
-          <div className="text-xs text-gray-500 italic">Table editing — use the AI to modify table content</div>
+          <div className="text-xs text-ui-muted italic">Table editing — use the AI to modify table content</div>
         ) : (
           <textarea
             value={section.content}
             onChange={e => onUpdate({ ...section, content: e.target.value })}
-            className="w-full text-sm text-gray-800 outline-none resize-none bg-transparent min-h-[36px]"
+            className="w-full text-sm text-ui-body outline-none resize-none bg-transparent min-h-[36px]"
             placeholder="Enter content..."
             rows={section.type === 'paragraph' ? 3 : 1}
           />
         )}
 
         {showImageTools && (
-          <div className="mt-3 border-t border-gray-100 pt-2">
+          <div className="mt-3 border-t border-ui-line pt-2">
             {section.images?.map((image, index) => (
-              <div key={`${section.id}-image-${index}`} className="mb-2 flex items-center gap-2 rounded-md bg-gray-50 p-1.5">
+              <div key={`${section.id}-image-${index}`} className="mb-2 flex items-center gap-2 rounded-md bg-ui-canvas p-1.5">
                 <Image
                   src={image.src}
                   alt={image.altText}
@@ -2067,11 +2061,11 @@ function SectionEditor({
                   unoptimized
                   className="h-12 w-[72px] rounded object-cover"
                 />
-                <span className="flex-1 truncate text-[10px] text-gray-600">{image.caption || image.altText}</span>
+                <span className="flex-1 truncate text-[10px] text-ui-muted">{image.caption || image.altText}</span>
                 <button
                   type="button"
                   onClick={() => onImageRemove(index)}
-                  className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  className="rounded p-1 text-ui-muted hover:bg-ui-danger-tint hover:text-ui-danger"
                   title="Remove image"
                 >
                   <Trash2 size={12} />
@@ -2082,11 +2076,11 @@ function SectionEditor({
               <button
                 type="button"
                 onClick={onImagePick}
-                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[10px] text-gray-600 hover:bg-gray-50"
+                className="inline-flex items-center gap-1 rounded-md border border-ui-line px-2 py-1 text-[10px] text-ui-muted hover:bg-ui-canvas"
               >
                 <ImagePlus size={12} /> Choose library photo
               </button>
-              <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[10px] text-gray-600 hover:bg-gray-50">
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-ui-line px-2 py-1 text-[10px] text-ui-muted hover:bg-ui-canvas">
                 {isUploadingImage ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
                 {isUploadingImage ? 'Uploading...' : 'Add from device'}
                 <input
@@ -2169,25 +2163,25 @@ function ItineraryImagePicker({
         role="dialog"
         aria-modal="true"
         aria-labelledby="itinerary-image-picker-title"
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-ui-panel shadow-xl"
       >
-        <div className="flex items-center gap-3 border-b border-gray-100 p-4">
+        <div className="flex items-center gap-3 border-b border-ui-line p-4">
           <div className="flex-1">
-            <h2 id="itinerary-image-picker-title" className="text-sm font-semibold text-gray-900">Choose a destination photo</h2>
-            <p className="mt-0.5 text-[11px] text-gray-500">Photos are optimized and embedded in this document.</p>
+            <h2 id="itinerary-image-picker-title" className="text-sm font-semibold text-ui-body">Choose a destination photo</h2>
+            <p className="mt-0.5 text-[11px] text-ui-muted">Photos are optimized and embedded in this document.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close image picker">
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-ui-muted hover:bg-ui-subtle hover:text-ui-muted" aria-label="Close image picker">
             <X size={16} />
           </button>
         </div>
         <label className="relative m-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ui-muted" />
           <input
             type="search"
             value={search}
             onChange={event => { setLimit(24); onSearch(event.target.value) }}
             placeholder="Search Colombo, Kandy, Sigiriya..."
-            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
+            className="w-full rounded-lg border border-ui-line py-2 pl-9 pr-3 text-xs outline-none focus:border-ui-accent"
           />
         </label>
         <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-3 pt-0 sm:grid-cols-3">
@@ -2196,7 +2190,7 @@ function ItineraryImagePicker({
               key={image.id}
               type="button"
               onClick={() => onSelect(image)}
-              className="overflow-hidden rounded-lg border border-gray-200 text-left hover:border-blue-400 hover:shadow-sm"
+              className="overflow-hidden rounded-lg border border-ui-line text-left hover:border-ui-accent hover:shadow-sm"
             >
               <Image
                 src={image.url}
@@ -2204,17 +2198,17 @@ function ItineraryImagePicker({
                 width={image.width}
                 height={image.height}
                 unoptimized
-                className="h-28 w-full bg-gray-100 object-cover"
+                className="h-28 w-full bg-ui-subtle object-cover"
               />
-              <span className="block truncate px-2 py-1.5 text-[11px] font-medium text-gray-700">{image.title}</span>
+              <span className="block truncate px-2 py-1.5 text-[11px] font-medium text-ui-muted">{image.title}</span>
             </button>
           ))}
           {filteredImages.length === 0 && (
-            <p className="col-span-full py-10 text-center text-xs text-gray-500">No matching photos found. Upload one from your device in the section editor.</p>
+            <p className="col-span-full py-10 text-center text-xs text-ui-muted">No matching photos found. Upload one from your device in the section editor.</p>
           )}
           {filteredImages.length > limit && (
             <button type="button" onClick={() => setLimit(current => current + 24)}
-              className="col-span-full rounded-lg border border-gray-200 p-2 text-xs text-gray-700">
+              className="col-span-full rounded-lg border border-ui-line p-2 text-xs text-ui-muted">
               Show more photos
             </button>
           )}
@@ -2247,18 +2241,18 @@ function AddSectionButton({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors ${compact ? 'px-2 py-1' : 'w-full justify-center px-3 py-2 border border-dashed border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50'}`}
+        className={`flex items-center gap-1 text-xs text-ui-muted hover:text-ui-accent transition-colors ${compact ? 'px-2 py-1' : 'w-full justify-center px-3 py-2 border border-dashed border-ui-line rounded-xl hover:border-ui-accent hover:bg-ui-tint'}`}
       >
         <Plus size={12} />
         {!compact && <span>Add Section</span>}
       </button>
       {isOpen && (
-        <div className="absolute z-10 mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[180px]">
+        <div className="absolute z-10 mt-1 left-0 bg-ui-panel border border-ui-line rounded-xl shadow-lg py-1 min-w-[180px]">
           {types.map(({ type, label }) => (
             <button
               key={type}
               onClick={() => { onAdd(type); setIsOpen(false) }}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+              className="w-full text-left px-3 py-1.5 text-xs text-ui-muted hover:bg-ui-canvas hover:text-ui-accent transition-colors"
             >
               {label}
             </button>

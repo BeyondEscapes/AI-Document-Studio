@@ -385,25 +385,25 @@ export default function ItineraryMapEditor({
   }
 
   return (
-    <section className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+    <section className="rounded-xl border border-ui-line bg-ui-tint/40 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-xs font-semibold text-blue-900">Sri Lanka road map</h3>
-          <p className="text-[10px] text-blue-700">Free OpenFreeMap background; place or reorder stops manually.</p>
+          <h3 className="text-xs font-semibold text-ui-accent">Sri Lanka road map</h3>
+          <p className="text-[10px] text-ui-accent">Free OpenFreeMap background; place or reorder stops manually.</p>
         </div>
-        <Route size={16} className="text-blue-600" />
+        <Route size={16} className="text-ui-accent" />
       </div>
 
       <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)]">
-        <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="relative overflow-hidden rounded-lg border border-ui-line bg-ui-panel">
           <div ref={mapContainer} className="mx-auto aspect-[3/4] w-full max-w-[320px]" />
           {placing !== null && (
-            <div className="absolute left-2 top-2 rounded-md bg-blue-700 px-2 py-1 text-[10px] text-white shadow">
+            <div className="absolute left-2 top-2 rounded-md bg-ui-action-hover px-2 py-1 text-[10px] text-white shadow">
               Click the map to place {placing === 'new' ? 'the new stop' : routeStops[placing]?.name || 'the stop'}
             </div>
           )}
           {mapError && (
-            <div className="absolute inset-x-2 top-2 rounded-md bg-red-50 p-2 text-[10px] text-red-700">
+            <div className="absolute inset-x-2 top-2 rounded-md bg-ui-danger-tint p-2 text-[10px] text-ui-danger">
               {mapError}
             </div>
           )}
@@ -411,36 +411,36 @@ export default function ItineraryMapEditor({
         <div className="space-y-2">
           <div className="max-h-[270px] space-y-2 overflow-y-auto">
             {routeStops.map((stop, index) => (
-              <div key={`${index}-${stop.name}`} className="rounded-lg border border-gray-200 bg-white p-2">
+              <div key={`${index}-${stop.name}`} className="rounded-lg border border-ui-line bg-ui-panel p-2">
                 <div className="flex items-start gap-1">
-                  <MapPin size={14} className="mt-1 shrink-0 text-blue-600" />
+                  <MapPin size={14} className="mt-1 shrink-0 text-ui-accent" />
                   <input
                     value={stop.name}
                     onChange={event => updateStopName(index, event.target.value)}
                     aria-label={`Stop ${index + 1} name`}
-                    className="min-w-0 flex-1 border-0 bg-transparent text-xs font-medium text-gray-800 outline-none"
+                    className="min-w-0 flex-1 border-0 bg-transparent text-xs font-medium text-ui-body outline-none"
                   />
-                  <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} title="Move stop up" className="text-gray-500 disabled:opacity-30">
+                  <button type="button" onClick={() => moveStop(index, -1)} disabled={index === 0} title="Move stop up" className="text-ui-muted disabled:opacity-30">
                     <ChevronUp size={14} />
                   </button>
-                  <button type="button" onClick={() => moveStop(index, 1)} disabled={index === routeStops.length - 1} title="Move stop down" className="text-gray-500 disabled:opacity-30">
+                  <button type="button" onClick={() => moveStop(index, 1)} disabled={index === routeStops.length - 1} title="Move stop down" className="text-ui-muted disabled:opacity-30">
                     <ChevronDown size={14} />
                   </button>
-                  <button type="button" onClick={() => removeStop(index)} title="Remove stop" className="text-gray-400 hover:text-red-600">
+                  <button type="button" onClick={() => removeStop(index)} title="Remove stop" className="text-ui-muted hover:text-ui-danger">
                     <X size={14} />
                   </button>
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-1 pl-5 text-[9px] text-gray-500">
+                <div className="mt-1 flex items-center justify-between gap-1 pl-5 text-[9px] text-ui-muted">
                   <span>{stop.latitude === null || stop.longitude === null
                     ? 'Location not set'
                     : `${stop.latitude.toFixed(4)}, ${stop.longitude.toFixed(4)}`}</span>
-                  <button type="button" onClick={() => beginPlacement(index)} className="font-medium text-blue-700 hover:underline">
+                  <button type="button" onClick={() => beginPlacement(index)} className="font-medium text-ui-accent hover:underline">
                     Place on map
                   </button>
                 </div>
               </div>
             ))}
-            {!routeStops.length && <p className="text-[10px] text-gray-500">Add stops or enter destinations above, then place them on the map.</p>}
+            {!routeStops.length && <p className="text-[10px] text-ui-muted">Add stops or enter destinations above, then place them on the map.</p>}
           </div>
 
           <div className="flex gap-2">
@@ -448,26 +448,26 @@ export default function ItineraryMapEditor({
               value={newStopName}
               onChange={event => setNewStopName(event.target.value)}
               placeholder="New stop name"
-              className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-[10px] outline-none focus:border-blue-400"
+              className="min-w-0 flex-1 rounded-lg border border-ui-line px-2 py-1.5 text-[10px] outline-none focus:border-ui-accent"
             />
-            <button type="button" onClick={() => beginPlacement('new')} disabled={!mapReady} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-[10px] font-medium text-blue-700 disabled:opacity-50">
+            <button type="button" onClick={() => beginPlacement('new')} disabled={!mapReady} className="inline-flex items-center gap-1 rounded-lg border border-ui-line bg-ui-panel px-2 py-1.5 text-[10px] font-medium text-ui-accent disabled:opacity-50">
               <Plus size={12} /> Add on map
             </button>
           </div>
         </div>
       </div>
 
-      {routeError && <p role="alert" className="mb-2 text-[10px] text-red-700">{routeError}</p>}
-      <p className="mb-2 text-[10px] text-gray-600">{routeMessage}</p>
+      {routeError && <p role="alert" className="mb-2 text-[10px] text-ui-danger">{routeError}</p>}
+      <p className="mb-2 text-[10px] text-ui-muted">{routeMessage}</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={generateRoadRoute} disabled={!mapReady || isRouting} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-2.5 py-1.5 text-[10px] font-medium text-white hover:bg-blue-800 disabled:opacity-50">
+        <button type="button" onClick={generateRoadRoute} disabled={!mapReady || isRouting} className="primary-button button-compact">
           {isRouting ? <Loader2 size={12} className="animate-spin" /> : <Route size={12} />}
           {isRouting ? 'Routing...' : 'Generate road route'}
         </button>
-        <button type="button" onClick={applyMap} disabled={!mapReady} className="rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-blue-700 disabled:opacity-50">
+        <button type="button" onClick={applyMap} disabled={!mapReady} className="secondary-button button-compact">
           Apply map to cover
         </button>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-medium text-gray-700 hover:bg-gray-50">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-ui-line bg-ui-panel px-2.5 py-1.5 text-[10px] font-medium text-ui-muted hover:bg-ui-canvas">
           <Upload size={12} /> Upload map image
           <input type="file" accept="image/*" className="hidden" onChange={event => {
             void handleUpload(event.target.files?.[0])
@@ -475,7 +475,7 @@ export default function ItineraryMapEditor({
           }} />
         </label>
       </div>
-      <p className="mt-2 text-[9px] text-gray-500">
+      <p className="mt-2 text-[9px] text-ui-muted">
         {mapImage ? 'A map image is included in the cover. Re-apply after changing stops.' : 'The cover map is blank until you apply a road map or upload your own image.'}
         {' '}{OPENFREEMAP_ATTRIBUTION}
       </p>

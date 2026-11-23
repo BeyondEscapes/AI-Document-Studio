@@ -7,6 +7,25 @@
   --color-brand-blue-light: #e8f0fb;
 }
 
+@theme inline {
+  --color-ui-canvas: var(--studio-bg);
+  --color-ui-panel: var(--studio-panel);
+  --color-ui-subtle: var(--studio-subtle);
+  --color-ui-line: var(--studio-line);
+  --color-ui-body: var(--studio-text);
+  --color-ui-muted: var(--studio-muted);
+  --color-ui-accent: var(--studio-accent);
+  --color-ui-tint: var(--studio-accent-tint);
+  --color-ui-action: var(--studio-action);
+  --color-ui-action-hover: var(--studio-action-hover);
+  --color-ui-danger: var(--studio-danger);
+  --color-ui-danger-tint: var(--studio-danger-tint);
+  --color-ui-danger-action: var(--studio-danger-action);
+  --color-ui-danger-hover: var(--studio-danger-hover);
+  --color-ui-warning: var(--studio-warning);
+  --color-ui-warning-tint: var(--studio-warning-tint);
+}
+
 :root {
   --brand-blue: #3973B9;
   --brand-blue-dark: #2d5a9e;
@@ -73,7 +92,7 @@ body {
 .loading-dot {
   width: 8px;
   height: 8px;
-  background: var(--brand-blue);
+  background: var(--studio-accent);
   border-radius: 50%;
   display: inline-block;
   animation: bounce 1.4s infinite ease-in-out both;

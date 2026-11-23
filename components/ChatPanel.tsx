@@ -155,27 +155,24 @@ export function ChatPanel({
   const isEmptyConversation = messages.length === 0
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-ui-panel">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 h-14">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-blue-500" />
-          <h1 className="text-sm font-semibold text-gray-800">
-            {conversation?.title || 'New Document'}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-ui-line h-14">
+        <div className="flex min-w-0 items-center gap-2">
+          <Sparkles size={16} className="shrink-0 text-ui-accent" />
+          <h1 className="truncate text-sm font-semibold text-ui-body">
+            {conversation?.documentContent?.title || conversation?.title || 'New document'}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          {messages.some(m => m.documentContent) && (
+        <div className="ml-2 flex shrink-0 items-center gap-2">
+          {(conversation?.documentContent || messages.some(m => m.documentContent)) && (
             <button
               onClick={onToggleDocPanel}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isDocPanelOpen
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-              }`}
+              aria-pressed={isDocPanelOpen}
+              className="secondary-button button-compact"
             >
               <FileText size={13} />
-              {isDocPanelOpen ? 'Hide Document' : 'View Document'}
+              {isDocPanelOpen ? 'Hide document' : 'View document'}
             </button>
           )}
         </div>
@@ -184,35 +181,35 @@ export function ChatPanel({
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto">
         {isEmptyConversation ? (
-          <div className="flex flex-col items-center justify-center h-full px-6 py-8">
+          <div className="flex min-h-full flex-col items-center justify-center px-6 py-8">
             {/* Welcome */}
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+            <div className="w-14 h-14 bg-ui-action rounded-2xl flex items-center justify-center mb-4 shadow-lg">
               <Sparkles size={24} className="text-white" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            <h2 className="text-xl font-semibold text-ui-body mb-2">
               AI Document Studio
             </h2>
-            <p className="text-sm text-gray-500 text-center max-w-sm mb-6">
+            <p className="text-sm text-ui-muted text-center max-w-sm mb-6">
               Describe the document you need. The same AI chat creates travel documents and business paperwork using Beyond Escapes templates.
             </p>
 
             {!apiKeyConfigured && (
-              <div className="w-full max-w-sm mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="w-full max-w-sm mb-6 p-4 bg-ui-warning-tint border border-ui-warning-tint rounded-xl">
                 <div className="flex items-start gap-2">
-                  <AlertCircle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                  <AlertCircle size={16} className="text-ui-warning mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-amber-800">API Key Required</p>
-                    <p className="text-xs text-amber-700 mt-1">
-                      Add your Gemini API key to <code className="bg-amber-100 px-1 rounded">.env.local</code>:
+                    <p className="text-sm font-medium text-ui-warning">API Key Required</p>
+                    <p className="text-xs text-ui-warning mt-1">
+                      Add your Gemini API key to <code className="bg-ui-warning-tint px-1 rounded">.env.local</code>:
                     </p>
-                    <code className="block text-xs mt-1 bg-amber-100 p-2 rounded text-amber-800">
+                    <code className="block text-xs mt-1 bg-ui-warning-tint p-2 rounded text-ui-warning">
                       GEMINI_API_KEY=your_key_here
                     </code>
                     <a
                       href="https://aistudio.google.com/app/apikey"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 mt-1 underline"
+                      className="inline-flex items-center gap-1 text-xs text-ui-warning hover:text-ui-warning mt-1 underline"
                     >
                       Get a free API key <ExternalLink size={10} />
                     </a>
@@ -223,15 +220,15 @@ export function ChatPanel({
 
             {/* Quick Prompts */}
             <div className="w-full max-w-sm space-y-2">
-              <p className="text-xs font-medium text-gray-500 mb-2">Quick start:</p>
+              <p className="text-xs font-medium text-ui-muted mb-2">Quick start:</p>
               {QUICK_PROMPTS.map((prompt, i) => (
                 <button
                   key={i}
                   onClick={() => handleSubmit(prompt)}
                   disabled={!apiKeyConfigured || isLoading}
-                  className="w-full text-left px-3 py-2.5 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-xs text-gray-600 hover:text-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 group"
+                  className="w-full text-left px-3 py-2.5 rounded-xl border border-ui-line hover:border-ui-accent hover:bg-ui-tint text-xs text-ui-muted hover:text-ui-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 group"
                 >
-                  <ChevronRight size={12} className="text-gray-400 group-hover:text-blue-500 flex-shrink-0" />
+                  <ChevronRight size={12} className="text-ui-muted group-hover:text-ui-accent flex-shrink-0" />
                   <span>{prompt}</span>
                 </button>
               ))}
@@ -249,18 +246,18 @@ export function ChatPanel({
 
       {/* Error Message */}
       {error && (
-        <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
-          <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-red-700">{error}</p>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+        <div className="mx-4 mb-2 p-3 bg-ui-danger-tint border border-ui-danger-tint rounded-xl flex items-start gap-2">
+          <AlertCircle size={14} className="text-ui-danger mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-ui-danger">{error}</p>
+          <button onClick={() => setError(null)} className="ml-auto text-ui-danger hover:text-ui-danger">
             ×
           </button>
         </div>
       )}
 
       {/* Input Area */}
-      <div className="px-4 pb-4 pt-2 border-t border-gray-100">
-        <div className="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+      <div className="px-4 pb-4 pt-2 border-t border-ui-line">
+        <div className="relative flex items-end gap-2 bg-ui-canvas border border-ui-line rounded-xl px-3 py-2 focus-within:border-ui-accent focus-within:ring-2 focus-within:ring-ui-line">
           <textarea
             ref={textareaRef}
             value={input}
@@ -269,13 +266,13 @@ export function ChatPanel({
             placeholder="Ask for a reservation, voucher, itinerary, invoice, confirmation, letter, or another business document..."
             rows={1}
             disabled={isLoading}
-            className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 resize-none outline-none min-h-[36px] max-h-40 py-1 disabled:opacity-50"
+            className="flex-1 bg-transparent text-sm text-ui-body placeholder-ui-muted resize-none outline-none min-h-[36px] max-h-40 py-1 disabled:opacity-50"
             style={{ scrollbarWidth: 'none' }}
           />
           <button
             onClick={() => handleSubmit()}
             disabled={!input.trim() || isLoading}
-            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
+            className="primary-button button-square shrink-0"
           >
             {isLoading ? (
               <RefreshCw size={15} className="animate-spin" />
@@ -284,7 +281,7 @@ export function ChatPanel({
             )}
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 text-center">
+        <p className="text-[10px] text-ui-muted mt-1.5 text-center">
           Press Enter to send • Shift+Enter for new line
         </p>
       </div>
@@ -297,20 +294,20 @@ function DocumentIntakeCard({ intake }: { intake: NonNullable<ChatMessage['docum
   const suppliedFields = template.fields.filter(field => intake.fields[field.key]?.trim())
 
   return (
-    <div className="w-full mt-1 rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-xs">
-      <p className="font-semibold text-blue-800">{template.label} details</p>
+    <div className="w-full mt-1 rounded-xl border border-ui-line bg-ui-panel px-3 py-2.5 text-xs">
+      <p className="font-semibold text-ui-accent">{template.label} details</p>
       {suppliedFields.length > 0 && (
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           {suppliedFields.map(field => (
             <div key={field.key} className="contents">
-              <dt className="text-gray-500">{field.label}</dt>
-              <dd className="min-w-0 text-gray-800 break-words">{intake.fields[field.key]}</dd>
+              <dt className="text-ui-muted">{field.label}</dt>
+              <dd className="min-w-0 text-ui-body break-words">{intake.fields[field.key]}</dd>
             </div>
           ))}
         </dl>
       )}
       {intake.missingFields.length > 0 && (
-        <p className="mt-2 text-amber-700">
+        <p className="mt-2 text-ui-warning">
           Still needed: {intake.missingFields.map(key => getDocumentFieldLabel(intake.documentType, key)).join(', ')}
         </p>
       )}
@@ -324,17 +321,17 @@ function ChatMessageBubble({ message, onViewDocument }: { message: ChatMessage; 
   if (message.isLoading) {
     return (
       <div className="flex items-start gap-3 message-enter">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+        <div className="w-7 h-7 rounded-lg bg-ui-action flex items-center justify-center flex-shrink-0">
           <Sparkles size={13} className="text-white" />
         </div>
-        <div className="flex-1 bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-2">
+        <div className="flex-1 bg-ui-canvas rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-2">
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <div className="loading-dot"></div>
             <div className="loading-dot"></div>
             <div className="loading-dot"></div>
           </div>
           {message.content ? (
-            <span className="text-xs text-blue-600 font-medium animate-pulse">{message.content}</span>
+            <span className="text-xs text-ui-accent font-medium animate-pulse">{message.content}</span>
           ) : null}
         </div>
       </div>
@@ -346,8 +343,8 @@ function ChatMessageBubble({ message, onViewDocument }: { message: ChatMessage; 
       {/* Avatar */}
       <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
         isUser
-          ? 'bg-gray-200 text-gray-600'
-          : 'bg-gradient-to-br from-blue-500 to-blue-600'
+          ? 'bg-ui-subtle text-ui-muted'
+          : 'bg-ui-action'
       }`}>
         {isUser ? (
           <span className="text-xs font-semibold">U</span>
@@ -360,8 +357,8 @@ function ChatMessageBubble({ message, onViewDocument }: { message: ChatMessage; 
       <div className={`flex-1 max-w-[85%] ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
           isUser
-            ? 'bg-blue-600 text-white rounded-tr-sm'
-            : 'bg-gray-50 border border-gray-100 text-gray-800 rounded-tl-sm'
+            ? 'bg-ui-action text-white rounded-tr-sm'
+            : 'bg-ui-canvas border border-ui-line text-ui-body rounded-tl-sm'
         }`}>
           {message.content}
         </div>
@@ -370,11 +367,11 @@ function ChatMessageBubble({ message, onViewDocument }: { message: ChatMessage; 
         {message.documentContent && (
           <button
             onClick={onViewDocument}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-200 hover:border-blue-400 hover:bg-blue-50 rounded-lg text-xs text-blue-600 font-medium transition-all shadow-sm"
+            className="secondary-button button-compact max-w-full"
           >
-            <FileText size={12} />
-            <span>View: {message.documentContent.title}</span>
-            <ChevronRight size={11} />
+            <FileText size={12} className="shrink-0" />
+            <span className="truncate">View: {message.documentContent.title}</span>
+            <ChevronRight size={11} className="shrink-0" />
           </button>
         )}
 
@@ -382,7 +379,7 @@ function ChatMessageBubble({ message, onViewDocument }: { message: ChatMessage; 
           <DocumentIntakeCard intake={message.documentIntake} />
         )}
 
-        <span className="text-[10px] text-gray-400 px-1">
+        <span className="text-[10px] text-ui-muted px-1">
           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
