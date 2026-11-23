@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import {
-  FileText, Download, X, Edit3, Eye, EyeOff, FileDown,
-  ChevronDown, ChevronUp, Trash2, Plus, AlertCircle,
+  FileText, Download, X, Edit3, Eye, FileDown,
+  ChevronDown, Trash2, Plus, AlertCircle,
   CheckCircle, Loader2, Palette, RefreshCw, Save, BadgeCheck,
   ImagePlus, Search, Upload, Sliders,
 } from 'lucide-react'
@@ -594,7 +594,8 @@ export function DocumentWorkspace({
   }, [isItinerary, documentContent?.metadata.generatedAt, documentContent?.metadata.prompt, imageCatalog, handleAutoMatchImages])
 
   const [detailStatus, setDetailStatus] = useState<string | null>(null)
-  const [isControlsBarHidden, setIsControlsBarHidden] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const optionsId = useId()
   const currentDetailLevel: ItineraryDetailLevel = documentContent?.detailLevel || 'medium'
 
   const handleDetailLevelChange = useCallback((level: ItineraryDetailLevel) => {
@@ -642,330 +643,90 @@ export function DocumentWorkspace({
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-ui-panel">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-ui-line h-14">
-        <FileText size={15} className="text-ui-accent flex-shrink-0" />
-        <h2 className="text-sm font-semibold text-ui-body flex-1 truncate">
-          {documentContent.title}
-        </h2>
-
-        {/* View Mode Toggle */}
-        <div className="flex items-center bg-ui-subtle rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode('preview')}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              viewMode === 'preview' ? 'bg-ui-panel text-ui-body shadow-sm' : 'text-ui-muted hover:text-ui-muted'
-            }`}
-          >
-            <Eye size={12} />
-            Preview
-          </button>
-          <button
-            onClick={() => setViewMode('edit')}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              viewMode === 'edit' ? 'bg-ui-panel text-ui-body shadow-sm' : 'text-ui-muted hover:text-ui-muted'
-            }`}
-          >
-            <Edit3 size={12} />
-            Edit
+      <div className="document-toolbar" aria-label="Document view and options">
+        <div className="document-toolbar-title">
+          <FileText size={15} className="shrink-0 text-ui-accent" aria-hidden="true" />
+          <h2 title={documentContent.title}>{documentContent.title}</h2>
+        </div>
+        <div className="document-toolbar-actions">
+          <div className="document-segments" role="group" aria-label="Document view">
+            <button type="button" onClick={() => setViewMode('preview')} aria-pressed={viewMode === 'preview'}>
+              <Eye size={13} aria-hidden="true" /> Preview
+            </button>
+            <button type="button" onClick={() => setViewMode('edit')} aria-pressed={viewMode === 'edit'}>
+              <Edit3 size={13} aria-hidden="true" /> Edit
+            </button>
+          </div>
+          {isItinerary ? (
+            <button type="button" className="secondary-button button-compact document-options-toggle"
+              onClick={() => setOptionsOpen(open => !open)}
+              aria-expanded={optionsOpen} aria-controls={optionsId} aria-label="Itinerary options" title="Itinerary options">
+              <Sliders size={13} aria-hidden="true" />
+              <span>{DETAIL_LEVEL_CONFIGS[currentDetailLevel].label} · {totalBodyPhotos} {totalBodyPhotos === 1 ? 'photo' : 'photos'}</span>
+              <ChevronDown size={12} aria-hidden="true" />
+            </button>
+          ) : (
+            <label className="document-template" title="Document template">
+              <Palette size={13} aria-hidden="true" />
+              <select value={selectedThemeId} aria-label="Document template" onChange={e => onThemeChange(e.target.value)}>
+                {themes.map(theme => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
+              </select>
+            </label>
+          )}
+          <button type="button" onClick={onClose} className="icon-button compact-icon" aria-label="Close document" title="Close document">
+            <X size={15} aria-hidden="true" />
           </button>
         </div>
-
-        {/* 1-Click Itinerary Photos Action Button */}
-        {isItinerary && (
-          <>
-            <button
-              type="button"
-              onClick={() => setIsControlsBarHidden(prev => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                isControlsBarHidden
-                  ? 'bg-ui-tint text-ui-accent hover:bg-ui-tint border-ui-line'
-                  : 'bg-ui-subtle text-ui-muted hover:bg-ui-subtle border-ui-line'
-              }`}
-              title={isControlsBarHidden ? 'Show itinerary controls' : 'Hide itinerary controls'}
-            >
-              {isControlsBarHidden ? <Eye size={12} /> : <EyeOff size={12} />}
-              <span className="hidden sm:inline">{isControlsBarHidden ? 'Show Controls' : 'Hide Controls'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleToggleAllPhotos}
-              disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs active:scale-95 ${
-                hasBodyPhotos
-                  ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:text-rose-800'
-                  : 'bg-ui-action text-white hover:bg-ui-action-hover disabled:opacity-50'
-              }`}
-              title={
-                hasBodyPhotos
-                  ? 'Remove all itinerary day photos in 1 click (preserves front cover and last page)'
-                  : 'Add destination photos to all itinerary days in 1 click (preserves front cover and last page)'
-              }
-            >
-              {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
-              <span>{hasBodyPhotos ? `Remove All Images (${totalBodyPhotos})` : 'Add All Images'}</span>
-            </button>
-          </>
-        )}
-
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg hover:bg-ui-subtle text-ui-muted hover:text-ui-muted transition-colors"
-        >
-          <X size={15} />
-        </button>
       </div>
 
-      {/* Template Selector */}
-      <div className="px-4 py-2 border-b border-ui-line bg-ui-canvas flex items-center gap-2">
-        <Palette size={12} className="text-ui-muted flex-shrink-0" />
-        <span className="text-xs text-ui-muted">Template:</span>
-        {isItinerary ? (
-          <span className="text-xs font-medium text-ui-muted">
-            Beyond Escapes Official <span className="font-normal text-ui-muted">(fixed for itinerary branding)</span>
-          </span>
-        ) : (
-          <select
-            value={selectedThemeId}
-            onChange={e => onThemeChange(e.target.value)}
-            className="text-xs border-0 bg-transparent text-ui-muted font-medium focus:outline-none cursor-pointer flex-1 max-w-xs"
-          >
-            {themes.map(theme => (
-              <option key={theme.id} value={theme.id}>{theme.name}</option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {/* Document Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {isItinerary && (
-          isControlsBarHidden ? (
-            /* Collapsed / Hidden Toolbar View */
-            <div className="sticky top-0 z-10 border-b border-ui-line bg-ui-panel/95 px-4 py-2 backdrop-blur-sm shadow-xs flex items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="font-semibold text-ui-muted flex items-center gap-1.5">
-                  <Sliders size={13} className="text-ui-accent" />
-                  Itinerary Controls
-                </span>
-                <span className="inline-flex items-center rounded-full bg-ui-tint px-2 py-0.5 text-[10px] font-medium text-ui-accent border border-ui-line">
-                  Detail: {DETAIL_LEVEL_CONFIGS[currentDetailLevel].label}
-                </span>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border ${
-                  hasBodyPhotos ? 'bg-ui-tint text-ui-accent border-ui-line' : 'bg-ui-canvas text-ui-muted border-ui-line'
-                }`}>
-                  Photos: {hasBodyPhotos ? `${totalBodyPhotos} added` : 'None'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsControlsBarHidden(false)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-ui-line bg-ui-tint px-2.5 py-1 text-xs font-semibold text-ui-accent hover:bg-ui-tint transition-colors shadow-2xs"
-                title="Show Detail Level and Photo controls"
-              >
-                <Eye size={12} />
-                <span>Show Controls</span>
+      {isItinerary && (
+        <section className="document-options-panel" id={optionsId} hidden={!optionsOpen} aria-label="Itinerary options">
+          <div className="document-options-row">
+            <span>Detail level</span>
+            <div className="document-segments" role="group" aria-label="Detail level">
+              {(['low', 'medium', 'high'] as const).map(level => (
+                <button key={level} type="button" onClick={() => handleDetailLevelChange(level)}
+                  aria-pressed={currentDetailLevel === level} title={DETAIL_LEVEL_CONFIGS[level].sublabel}>
+                  {DETAIL_LEVEL_CONFIGS[level].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="document-options-row">
+            <span>Day photos</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" onClick={handleToggleAllPhotos}
+                disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
+                className={hasBodyPhotos ? 'secondary-button button-compact button-error' : 'primary-button button-compact'}
+                title={hasBodyPhotos ? 'Remove all day photos' : 'Add photos to all itinerary days'}>
+                {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
+                {hasBodyPhotos ? 'Remove photos' : 'Add photos'}
+              </button>
+              <button type="button"
+                onClick={() => hasBodyPhotos ? handleAddPhotosToAllPages(true) : handleAutoMatchImages()}
+                disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
+                className="secondary-button button-compact">
+                <RefreshCw size={13} className={isMatchingImages ? 'animate-spin' : ''} />
+                {hasBodyPhotos ? 'Rematch photos' : 'Auto-match'}
               </button>
             </div>
-          ) : (
-            /* Full Expanded Controls View */
-            <div className="sticky top-0 z-10 border-b border-ui-line bg-ui-panel/95 px-4 py-2.5 backdrop-blur-sm shadow-xs space-y-2">
-              {/* Controls Header with Hide Button */}
-              <div className="flex items-center justify-between pb-1 border-b border-ui-line">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ui-muted">
-                    Itinerary Controls
-                  </span>
-                  <span className="text-[10px] text-ui-muted">
-                    (Detail level &amp; photo options)
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsControlsBarHidden(true)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-ui-line bg-ui-panel px-2.5 py-1 text-xs font-medium text-ui-muted hover:bg-ui-subtle hover:text-ui-body transition-colors shadow-2xs"
-                  title="Hide these controls to view more document content"
-                >
-                  <EyeOff size={12} className="text-ui-muted" />
-                  <span>Hide Controls</span>
-                </button>
-              </div>
-
-              {/* 3 Functional Detail Level Buttons: Low, Medium, High */}
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ui-line bg-ui-tint/70 p-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-ui-tint text-ui-accent">
-                    <Sliders size={15} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-ui-accent">
-                        Itinerary Detail Level
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-ui-tint px-2 py-0.5 text-[10px] font-medium text-ui-accent">
-                        {DETAIL_LEVEL_CONFIGS[currentDetailLevel].badgeText}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-ui-accent/80">
-                      Adjust document depth: Low (short &amp; sweet), Medium (current size), or High (extra advanced details)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="inline-flex items-center rounded-lg border border-ui-line bg-ui-panel p-0.5 shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={() => handleDetailLevelChange('low')}
-                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                      currentDetailLevel === 'low'
-                        ? 'bg-ui-action text-white shadow-xs font-semibold'
-                        : 'text-ui-muted hover:bg-ui-subtle'
-                    }`}
-                    title="Low: Short & sweet, concise daily highlights for quick reading"
-                  >
-                    <span>Low</span>
-                    <span className="hidden sm:inline text-[10px] opacity-80">(Short &amp; Sweet)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDetailLevelChange('medium')}
-                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                      currentDetailLevel === 'medium'
-                        ? 'bg-ui-action text-white shadow-xs font-semibold'
-                        : 'text-ui-muted hover:bg-ui-subtle'
-                    }`}
-                    title="Medium: Current standard document size"
-                  >
-                    <span>Medium</span>
-                    <span className="hidden sm:inline text-[10px] opacity-80">(Current Size)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDetailLevelChange('high')}
-                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                      currentDetailLevel === 'high'
-                        ? 'bg-ui-action text-white shadow-xs font-semibold'
-                        : 'text-ui-muted hover:bg-ui-subtle'
-                    }`}
-                    title="High: Extra advanced details, timing guides & comprehensive context"
-                  >
-                    <span>High</span>
-                    <span className="hidden sm:inline text-[10px] opacity-80">(Extra Details)</span>
-                  </button>
-                </div>
-              </div>
-              {detailStatus && (
-                <div className="flex items-center justify-between text-[10px] font-medium text-ui-accent bg-ui-tint/70 px-2.5 py-1 rounded-md border border-ui-line">
-                  <span>{detailStatus}</span>
-                  <button
-                    type="button"
-                    onClick={() => setDetailStatus(null)}
-                    className="text-ui-accent hover:text-ui-accent font-bold ml-2 text-xs"
-                    title="Dismiss"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-
-              {/* Itinerary Photos 1-Click Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ui-line bg-ui-tint/70 p-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-ui-tint text-ui-accent">
-                    <ImagePlus size={15} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-ui-accent">
-                        Itinerary Photos
-                      </span>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        hasBodyPhotos ? 'bg-ui-tint text-ui-accent' : 'bg-ui-subtle text-ui-muted'
-                      }`}>
-                        {hasBodyPhotos ? `${totalBodyPhotos} photo${totalBodyPhotos === 1 ? '' : 's'} added` : 'No photos added'}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-ui-accent/80">
-                      1-click photo controls for all itinerary days (front cover &amp; last page remain untouched)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {/* 1-Click Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={handleToggleAllPhotos}
-                    disabled={!hasBodyPhotos && (isLoadingImageCatalog || imageCatalog.length === 0)}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 ${
-                      hasBodyPhotos
-                        ? 'bg-ui-danger-action text-white hover:bg-ui-danger-hover'
-                        : 'bg-ui-action text-white hover:bg-ui-action-hover disabled:opacity-50'
-                    }`}
-                    title={
-                      hasBodyPhotos
-                        ? 'Remove all photos from itinerary days in 1 click (preserves front and back pages)'
-                        : 'Add destination photos to all itinerary days in 1 click (preserves front and back pages)'
-                    }
-                  >
-                    {hasBodyPhotos ? <Trash2 size={13} /> : <ImagePlus size={13} />}
-                    <span>{hasBodyPhotos ? 'Remove All Images' : 'Add All Images'}</span>
-                  </button>
-
-                  {/* Explicit buttons for instant 1-click add or remove anytime */}
-                  {hasBodyPhotos ? (
-                    <button
-                      type="button"
-                      onClick={() => handleAddPhotosToAllPages(true)}
-                      disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
-                      className="inline-flex items-center gap-1 rounded-md border border-ui-line bg-ui-panel px-2.5 py-1.5 text-[11px] font-medium text-ui-accent hover:bg-ui-tint"
-                      title="Refresh and re-match photos for all itinerary days"
-                    >
-                      <RefreshCw size={11} className={isMatchingImages ? 'animate-spin' : ''} />
-                      <span>Re-match All</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleAutoMatchImages}
-                      disabled={isLoadingImageCatalog || isMatchingImages || imageCatalog.length === 0}
-                      className="inline-flex items-center gap-1 rounded-md border border-ui-line bg-ui-panel px-2.5 py-1.5 text-[11px] font-medium text-ui-accent hover:bg-ui-tint"
-                    >
-                      <span>Auto-match</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-              {imageStatus && (
-                <div className="flex items-center justify-between text-[10px] font-medium text-ui-accent bg-ui-tint/70 px-2.5 py-1 rounded-md border border-ui-line">
-                  <span>{imageStatus}</span>
-                  <button
-                    type="button"
-                    onClick={() => setImageStatus(null)}
-                    className="text-ui-accent hover:text-ui-accent font-bold ml-2 text-xs"
-                    title="Dismiss"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-              {imageError && (
-                <div className="flex items-center justify-between text-[10px] font-medium text-ui-danger bg-ui-danger-tint/70 px-2.5 py-1 rounded-md border border-ui-danger-tint">
-                  <span>{imageError}</span>
-                  <button
-                    type="button"
-                    onClick={() => setImageError(null)}
-                    className="text-ui-danger hover:text-ui-danger font-bold ml-2 text-xs"
-                    title="Dismiss"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
+          </div>
+          <p className="document-options-template"><Palette size={12} aria-hidden="true" /> Beyond Escapes Official template</p>
+          {([
+            { message: detailStatus, clear: setDetailStatus, label: 'detail update' },
+            { message: imageStatus, clear: setImageStatus, label: 'photo update' },
+            { message: imageError, clear: setImageError, label: 'photo error' },
+          ] as const).map(({ message, clear, label }) => message && (
+            <div key={label} className="document-options-notice" role={label === 'photo error' ? 'alert' : 'status'}>
+              {message}
+              <button type="button" onClick={() => clear(null)} aria-label={'Dismiss ' + label}>
+                <X size={13} aria-hidden="true" />
+              </button>
             </div>
-          )
-        )}
+          ))}
+        </section>
+      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === 'preview' ? (
           <div className="studio-paper"><DocumentPreview documentContent={documentContent} /></div>
         ) : (
@@ -1113,7 +874,7 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
   const sections = extractItinerarySections(documentContent.sections).remaining
   const fields = documentContent.intake?.fields ?? {}
   const cover = documentContent.itineraryPages?.cover ?? {}
-  const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim()
+  const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim() || ''
   const routeStops = cover.routeStops ?? getInitialRouteStops(routeText)
   const routePlan = routeStops.map((stop, index) => `${index + 1}. ${stop.name}`).join('  >  ')
     || routeText
