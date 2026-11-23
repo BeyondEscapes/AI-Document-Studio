@@ -16,7 +16,8 @@ export default async function StudioPage({ searchParams }: {
     <div className="workspace-frame">
       <WorkspaceHeader userId={user.id} name={user.name} role={user.role} />
       <StudioWorkspace key={conversation?.id || 'new'} userId={user.id} initialConversation={conversation}
-        openInEdit={Boolean(document)} cloudDocuments={useMongoDocuments()} />
+        openInEdit={Boolean(document)} cloudDocuments={useMongoDocuments()}
+        serverPdfAvailable={!process.env.VERCEL || Boolean(process.env.PDF_CONVERTER_URL && process.env.PDF_CONVERTER_TOKEN)} />
     </div>
   )
 }

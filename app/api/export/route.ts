@@ -45,18 +45,14 @@ export async function POST(request: NextRequest) {
       ? sanitizeFilename(filename.replace(/\.(docx|pdf)$/i, '')) + '.docx'
       : generateFilename(content, 'docx')
     if (process.env.VERCEL) {
+      const converterUrl = process.env.PDF_CONVERTER_URL?.replace(/\/+$/, '')
+      const converterToken = process.env.PDF_CONVERTER_TOKEN
+      if (format === 'pdf' && (!converterUrl || !converterToken)) {
+        return NextResponse.json({ error: 'Use Save as PDF in your browser.', browserPdfAvailable: true }, { status: 503 })
+      }
       const buffer = await generateBrandedDocx(content, templatePath)
 
       if (format === 'pdf') {
-        const converterUrl = process.env.PDF_CONVERTER_URL?.replace(/\/+$/, '')
-        const converterToken = process.env.PDF_CONVERTER_TOKEN
-        if (!converterUrl || !converterToken) {
-          return NextResponse.json(
-            { error: 'PDF conversion is not configured. Deploy the converter service and set PDF_CONVERTER_URL and PDF_CONVERTER_TOKEN in Vercel.' },
-            { status: 503 }
-          )
-        }
-
         const formData = new FormData()
         formData.append(
           'document',
@@ -145,6 +141,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           error: pdfResult.error || 'PDF conversion failed',
+          browserPdfAvailable: true,
           docxAvailable: true,
           docxFilename,
           docxDownloadUrl: downloadUrl(docxFilename),

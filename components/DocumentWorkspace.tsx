@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import {
@@ -37,6 +38,7 @@ const ItineraryMapEditor = dynamic(() => import('@/components/ItineraryMapEditor
 interface DocumentWorkspaceProps {
   startInEdit?: boolean
   cloudDocuments?: boolean
+  serverPdfAvailable: boolean
   documentContent: DocumentContent | null
   themes: DocumentTheme[]
   selectedThemeId: string
@@ -66,7 +68,7 @@ function hasCurrentItineraryMap(content: DocumentContent): boolean {
 
 export function DocumentWorkspace({
   documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate,
-  onSaveDocument, saveStatus, saveError, onClose, startInEdit, cloudDocuments
+  onSaveDocument, saveStatus, saveError, onClose, startInEdit, cloudDocuments, serverPdfAvailable
 }: DocumentWorkspaceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(startInEdit ? 'edit' : 'preview')
   const [manualSaveError, setManualSaveError] = useState<string | null>(null)
@@ -79,6 +81,9 @@ export function DocumentWorkspace({
   const [isMatchingImages, setIsMatchingImages] = useState(false)
   const [uploadingImageSectionId, setUploadingImageSectionId] = useState<string | null>(null)
   const autoMatchedDocumentKey = useRef<string | null>(null)
+  const [browserPdf, setBrowserPdf] = useState(!serverPdfAvailable)
+  const [printDocument, setPrintDocument] = useState<DocumentContent | null>(null)
+  const printSheet = useRef<HTMLDivElement>(null)
   const [exportStatus, setExportStatus] = useState<{
     docx: 'idle' | 'loading' | 'success' | 'error'
     pdf: 'idle' | 'loading' | 'success' | 'error'
@@ -89,6 +94,36 @@ export function DocumentWorkspace({
   }>({ docx: 'idle', pdf: 'idle' })
 
   const isItinerary = isItineraryDocument(documentContent)
+
+  useEffect(() => {
+    if (!printDocument || !printSheet.current) return
+    const sheet = printSheet.current
+    const originalTitle = document.title
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    function finish() {
+      setPrintDocument(null)
+    }
+    window.addEventListener('afterprint', finish, { once: true })
+    const images = [...sheet.querySelectorAll('img')].map(image => {
+      image.loading = 'eager'
+      return image.decode().catch(() => undefined)
+    })
+    void Promise.race([
+      Promise.all(images),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, 4000) }),
+    ]).then(() => {
+      if (cancelled) return
+      document.title = printDocument.title || 'Beyond Escapes document'
+      window.print()
+    })
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+      document.title = originalTitle
+      window.removeEventListener('afterprint', finish)
+    }
+  }, [printDocument])
 
   useEffect(() => {
     if (!isItinerary) {
@@ -128,7 +163,12 @@ export function DocumentWorkspace({
       }))
       return
     }
-    
+    if (format === 'pdf' && browserPdf) {
+      setExportStatus(prev => ({ ...prev, pdf: 'idle', pdfError: undefined }))
+      setPrintDocument(documentContent)
+      return
+    }
+
     setExportStatus(prev => ({
       ...prev,
       [format]: 'loading',
@@ -180,6 +220,7 @@ export function DocumentWorkspace({
             docxAvailable?: boolean
             docxFilename?: string
             docxDownloadUrl?: string
+            browserPdfAvailable?: boolean
           }
       try {
         data = JSON.parse(responseText)
@@ -204,6 +245,12 @@ export function DocumentWorkspace({
         link.click()
         document.body.removeChild(link)
       } else {
+        if (format === 'pdf' && (data.browserPdfAvailable || res.status === 502 || res.status === 503)) {
+          setBrowserPdf(true)
+          setExportStatus(prev => ({ ...prev, pdf: 'idle', pdfError: undefined }))
+          setPrintDocument(documentContent)
+          return
+        }
         setExportStatus(prev => ({
           ...prev,
           [format]: 'error',
@@ -941,121 +988,62 @@ export function DocumentWorkspace({
         )}
       </div>
 
-      {/* Export Panel */}
-      <div className="shrink-0 max-h-[35vh] overflow-y-auto border-t border-ui-line px-4 py-3 bg-ui-panel">
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={handleSave}
-            disabled={saveStatus === 'saving'}
-            className="secondary-button button-compact flex-1"
-          >
-            {saveStatus === 'saving' ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            {saveStatus === 'saving' ? 'Saving...' : 'Save document'}
-          </button>
-          <button
-            onClick={handleApprovalToggle}
-            disabled={documentContent.approval?.status !== 'approved' && missingRequiredFields.length > 0}
-            className={`button-compact flex-1 ${
-              documentContent.approval?.status === 'approved'
-                ? 'secondary-button'
-                : 'primary-button'
-            }`}
-          >
-            <BadgeCheck size={14} />
-            {documentContent.approval?.status === 'approved' ? 'Reopen as draft' : 'Approve document'}
-          </button>
+      <section aria-label="Save and export" className="shrink-0 border-t border-ui-line bg-ui-panel px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className={`status-pill ${documentContent.approval?.status === 'approved' ? 'status-approved' : ''}`}>
+              {documentContent.approval?.status === 'approved' ? 'Approved' : 'Draft'}
+            </span>
+            <span role="status" className="text-[11px] text-ui-muted">
+              {saveStatus === 'saving' ? 'Saving?' : saveStatus === 'saved' ? (cloudDocuments ? 'Saved to MongoDB' : 'Saved') : ''}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button type="button" onClick={handleSave} disabled={saveStatus === 'saving'}
+              className="secondary-button button-compact">
+              {saveStatus === 'saving' ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              Save
+            </button>
+            <button type="button" onClick={handleApprovalToggle}
+              disabled={documentContent.approval?.status !== 'approved' && missingRequiredFields.length > 0}
+              className="secondary-button button-compact">
+              <BadgeCheck size={13} />
+              {documentContent.approval?.status === 'approved' ? 'Reopen draft' : 'Approve'}
+            </button>
+            <button type="button" onClick={() => handleExport('docx')} disabled={exportStatus.docx === 'loading'}
+              className="primary-button button-compact" title="Download Word document">
+              {exportStatus.docx === 'loading' ? <Loader2 size={13} className="animate-spin" />
+                : exportStatus.docx === 'success' ? <CheckCircle size={13} /> : <Download size={13} />}
+              Word
+            </button>
+            <button type="button" onClick={() => handleExport('pdf')} disabled={exportStatus.pdf === 'loading' || Boolean(printDocument)}
+              className="secondary-button button-compact" title={browserPdf ? 'Choose Save as PDF in the browser print dialog' : 'Download PDF'}>
+              {exportStatus.pdf === 'loading' || printDocument ? <Loader2 size={13} className="animate-spin" />
+                : exportStatus.pdf === 'success' ? <CheckCircle size={13} /> : <FileDown size={13} />}
+              {browserPdf ? 'Save as PDF' : 'PDF'}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center justify-between mb-2 text-[10px]">
-          <span className={saveStatus === 'error' ? 'text-ui-danger' : 'text-ui-muted'}>
-            {saveStatus === 'error'
-              ? saveError || manualSaveError || 'Could not save. Try saving again.'
-              : saveStatus === 'saving'
-                ? 'Saving changes...'
-                : saveStatus === 'saved'
-                  ? (cloudDocuments ? 'Saved to MongoDB' : 'Saved on this server')
-                  : 'Changes save automatically'}
-          </span>
-          <span className={`status-pill ${documentContent.approval?.status === 'approved' ? 'status-approved' : ''}`}>
-            {documentContent.approval?.status === 'approved' ? 'Approved' : 'Draft'}
-          </span>
-        </div>
+        {(saveError || manualSaveError || exportStatus.docxError || exportStatus.pdfError) && (
+          <div role="alert" className="mt-1 space-y-1 text-xs text-ui-danger">
+            {[saveError || manualSaveError, exportStatus.docxError, exportStatus.pdfError]
+              .filter((message, index, messages) => message && messages.indexOf(message) === index)
+              .map(message => <p key={message}>{message}</p>)}
+          </div>
+        )}
         {missingRequiredFields.length > 0 && (
-          <p className="text-[10px] text-ui-warning mb-2">
-            Complete these required fields before approval: {missingRequiredFields
-              .map(key => getDocumentFieldLabel(documentContent.intake!.documentType, key))
-              .join(', ')}
+          <p className="mt-1 text-[11px] text-ui-warning">
+            Required for approval: {missingRequiredFields
+              .map(key => getDocumentFieldLabel(documentContent.intake!.documentType, key)).join(', ')}
           </p>
         )}
-        <p className="text-xs font-semibold text-ui-muted mb-2">Export Document</p>
-        <div className="flex gap-2">
-          {/* DOCX Button */}
-          <div className="flex-1">
-            <button
-              onClick={() => handleExport('docx')}
-              disabled={exportStatus.docx === 'loading'}
-              className={`w-full ${
-                exportStatus.docx === 'success'
-                  ? 'secondary-button'
-                  : exportStatus.docx === 'error'
-                  ? 'secondary-button button-error'
-                  : 'primary-button'
-              }`}
-            >
-              {exportStatus.docx === 'loading' ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : exportStatus.docx === 'success' ? (
-                <CheckCircle size={15} />
-              ) : exportStatus.docx === 'error' ? (
-                <AlertCircle size={15} />
-              ) : (
-                <Download size={15} />
-              )}
-              <span>
-                {exportStatus.docx === 'loading' ? 'Generating...'
-                  : exportStatus.docx === 'success' ? 'Downloaded!'
-                  : exportStatus.docx === 'error' ? 'Retry DOCX'
-                  : 'Word (.docx)'}
-              </span>
-            </button>
-            {exportStatus.docx === 'error' && exportStatus.docxError && (
-              <p className="text-[10px] text-ui-danger mt-1 text-center">{exportStatus.docxError}</p>
-            )}
-          </div>
-
-          {/* PDF Button */}
-          <div className="flex-1">
-            <button
-              onClick={() => handleExport('pdf')}
-              disabled={exportStatus.pdf === 'loading'}
-              className={`secondary-button w-full ${exportStatus.pdf === 'error' ? 'button-error' : ''}`}
-            >
-              {exportStatus.pdf === 'loading' ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : exportStatus.pdf === 'success' ? (
-                <CheckCircle size={15} />
-              ) : exportStatus.pdf === 'error' ? (
-                <AlertCircle size={15} />
-              ) : (
-                <FileDown size={15} />
-              )}
-              <span>
-                {exportStatus.pdf === 'loading' ? 'Converting...'
-                  : exportStatus.pdf === 'success' ? 'Downloaded!'
-                  : exportStatus.pdf === 'error' ? 'Retry PDF'
-                  : 'PDF (.pdf)'}
-              </span>
-            </button>
-            {exportStatus.pdf === 'error' && exportStatus.pdfError && (
-              <p className="text-[10px] text-ui-danger mt-1 text-center">{exportStatus.pdfError}</p>
-            )}
-          </div>
-        </div>
-
-        {/* LibreOffice note */}
-        <p className="text-[10px] text-ui-muted mt-2 text-center">
-          PDF requires LibreOffice • DOCX uses Beyond Escapes template
-        </p>
-      </div>
+      </section>
+      {printDocument && createPortal(
+        <div ref={printSheet} className="document-print-sheet studio-paper" aria-hidden="true">
+          <DocumentPreview documentContent={printDocument} />
+        </div>,
+        document.body,
+      )}
       {imagePickerSectionId && (
         <ItineraryImagePicker
           images={imageCatalog}
@@ -1133,7 +1121,7 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
 
   return (
     <div className="space-y-5 p-5 max-w-3xl mx-auto">
-      <article className="overflow-hidden rounded-lg border border-gray-200 bg-white p-5 shadow-sm doc-preview">
+      <article className="print-cover overflow-hidden rounded-lg border border-gray-200 bg-white p-5 shadow-sm doc-preview">
         <div className="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
           <Image
             src="/images/beyond_escapes_logo.png"
@@ -1206,7 +1194,7 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
       </article>
 
       {/* Closing Document Pages: Quotation, Optional Entrance Fees, Inclusions, Exclusions, Cancellation Policy */}
-      <article className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm doc-preview space-y-6">
+      <article className="print-closing rounded-lg border border-gray-200 bg-white p-6 shadow-sm doc-preview space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-2">
           <Image
@@ -1607,7 +1595,7 @@ function SectionBody({ section }: { section: DocumentSection }) {
 
     case 'page_break':
       return (
-        <div className="my-4 border-t-2 border-dashed border-gray-200 relative">
+        <div className="print-page-break my-4 border-t-2 border-dashed border-gray-200 relative">
           <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white px-2 text-[10px] text-gray-400">
             — Page Break —
           </span>

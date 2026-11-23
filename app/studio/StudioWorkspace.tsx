@@ -8,11 +8,12 @@ import { prepareDocumentForLocalSave } from '@/lib/itinerary-images'
 import { rememberStudioConversation } from '@/lib/studio-navigation'
 import type { Conversation, DocumentContent, DocumentTheme, AppSettings } from '@/types'
 
-export default function StudioWorkspace({ userId, initialConversation, cloudDocuments, openInEdit }: {
+export default function StudioWorkspace({ userId, initialConversation, cloudDocuments, openInEdit, serverPdfAvailable }: {
   userId: string
   initialConversation: Conversation | null
   cloudDocuments: boolean
   openInEdit: boolean
+  serverPdfAvailable: boolean
 }) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(initialConversation)
@@ -343,6 +344,7 @@ export default function StudioWorkspace({ userId, initialConversation, cloudDocu
               saveStatus={documentSaveStatus}
               saveError={documentSaveError}
               cloudDocuments={cloudDocuments}
+              serverPdfAvailable={serverPdfAvailable}
               onClose={() => setIsDocPanelOpen(false)}
             />
           </div>

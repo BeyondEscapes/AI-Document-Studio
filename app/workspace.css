@@ -159,6 +159,39 @@
 .button-compact { min-height: 34px; padding: 0 11px; font-size: .78rem; }
 .button-square { width: 38px; min-height: 38px; padding: 0; }
 .studio-paper { background: white; color: #142a3b; color-scheme: light; }
+.document-print-sheet {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 186mm;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html:has(.document-print-sheet),
+  body:has(> .document-print-sheet) {
+    height: auto;
+    overflow: visible;
+    background: white;
+  }
+  body:has(> .document-print-sheet) > :not(.document-print-sheet) { display: none !important; }
+  .document-print-sheet {
+    position: static;
+    width: auto;
+    visibility: visible;
+    print-color-adjust: exact;
+  }
+  .document-print-sheet > div { max-width: none; padding: 0; }
+  .document-print-sheet article { overflow: visible; margin: 0; padding: 0; border: 0; box-shadow: none; }
+  .document-print-sheet .print-cover, .document-print-sheet .print-page-break { break-after: page; }
+  .document-print-sheet .print-closing { break-before: page; }
+  .document-print-sheet .print-page-break { height: 0; margin: 0; border: 0; }
+  .document-print-sheet .print-page-break span { display: none; }
+  .document-print-sheet :is(h1, h2, h3, h4, .doc-heading-bar) { break-after: avoid; }
+  .document-print-sheet :is(figure, tr) { break-inside: avoid; }
+}
 :is(.auth-screen, .workspace-frame) button:disabled { cursor: wait; opacity: .65; }
 .text-link, .auth-switch a { color: var(--studio-accent); font-weight: 650; }
 .text-link:hover, .auth-switch a:hover { text-decoration: underline; }
