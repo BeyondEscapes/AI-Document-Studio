@@ -19,6 +19,9 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
   const [isDocPanelOpen, setIsDocPanelOpen] = useState(Boolean(initialConversation?.documentContent))
   const [documentSaveStatus, setDocumentSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(initialConversation?.documentContent ? 'saved' : 'idle')
   const [documentSaveError, setDocumentSaveError] = useState<string | null>(null)
+  const [openingId, setOpeningId] = useState<string | null>(null)
+  const [openError, setOpenError] = useState<{ conversation: Conversation; message: string } | null>(null)
+  const conversationRequests = useRef(new Map<string, { promise: Promise<Conversation>; expires: number }>())
   const activeId = useRef(initialConversation?.id)
   const selectedRequest = useRef(0)
   const pendingSave = useRef<Promise<unknown>>(Promise.resolve())
@@ -70,6 +73,8 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
 
   const handleNewConversation = useCallback(() => {
     selectedRequest.current += 1
+    setOpeningId(null)
+    setOpenError(null)
     activeId.current = undefined
     setActiveConversation(null)
     setDocumentContent(null)
@@ -78,34 +83,63 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
     setDocumentSaveError(null)
   }, [])
 
+  const loadConversation = useCallback((id: string) => {
+    const existing = conversationRequests.current.get(id)
+    if (existing && existing.expires > Date.now()) return existing.promise
+    const promise = fetch(`/api/conversations/${encodeURIComponent(id)}`, { cache: 'no-store' })
+      .then(async response => {
+        const data = await response.json()
+        if (!response.ok || !data.conversation) throw new Error(data.error || 'Could not open this conversation.')
+        return data.conversation as Conversation
+      })
+      .catch(error => {
+        if (conversationRequests.current.get(id)?.promise === promise) conversationRequests.current.delete(id)
+        throw error
+      })
+    conversationRequests.current.set(id, { promise, expires: Date.now() + 30_000 })
+    for (const [key, request] of conversationRequests.current) {
+      if (request.expires <= Date.now()) conversationRequests.current.delete(key)
+    }
+    return promise
+  }, [])
+
+  const prefetchConversation = useCallback((id: string) => {
+    if (id !== activeId.current) void loadConversation(id).catch(() => undefined)
+  }, [loadConversation])
+
   const handleSelectConversation = useCallback(async (conversation: Conversation) => {
     const requestNumber = ++selectedRequest.current
-    try {
-      const res = await fetch(`/api/conversations/${conversation.id}`)
-      const data = await res.json()
-      if (data.success && selectedRequest.current === requestNumber) {
-        activeId.current = data.conversation.id
-        setActiveConversation(data.conversation)
-        if (data.conversation.selectedTheme) setSelectedThemeId(data.conversation.selectedTheme)
-        if (data.conversation.documentContent) {
-          setDocumentContent(data.conversation.documentContent)
-          setIsDocPanelOpen(true)
-          setDocumentSaveStatus('saved')
-        } else {
-          setDocumentContent(null)
-          setIsDocPanelOpen(false)
-          setDocumentSaveStatus('idle')
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load conversation:', err)
+    setOpenError(null)
+    if (activeId.current === conversation.id) {
+      setOpeningId(null)
+      setIsDocPanelOpen(Boolean(documentContent))
+      return
     }
-  }, [])
+    setOpeningId(conversation.id)
+    try {
+      const loaded = await loadConversation(conversation.id)
+      if (selectedRequest.current !== requestNumber) return
+      activeId.current = loaded.id
+      setActiveConversation(loaded)
+      setSelectedThemeId(loaded.selectedTheme || settings?.defaultThemeId || 'beyond-escapes-official')
+      setDocumentContent(loaded.documentContent ?? null)
+      setIsDocPanelOpen(Boolean(loaded.documentContent))
+      setDocumentSaveStatus(loaded.documentContent ? 'saved' : 'idle')
+      setDocumentSaveError(null)
+    } catch (error) {
+      if (selectedRequest.current === requestNumber) {
+        setOpenError({ conversation, message: error instanceof Error ? error.message : 'Could not open this conversation.' })
+      }
+    } finally {
+      if (selectedRequest.current === requestNumber) setOpeningId(null)
+    }
+  }, [documentContent, loadConversation, settings?.defaultThemeId])
 
   const handleDeleteConversation = useCallback(async (id: string) => {
     try {
       const response = await fetch(`/api/conversations/${id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error('Could not delete conversation.')
+      conversationRequests.current.delete(id)
       setConversations(prev => prev.filter(c => c.id !== id))
       if (activeConversation?.id === id) {
         activeId.current = undefined
@@ -124,6 +158,7 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
     newDocContent?: DocumentContent,
     clearDocument = false
   ) => {
+    conversationRequests.current.delete(updatedConversation.id)
     activeId.current = updatedConversation.id
     setActiveConversation(updatedConversation)
     setConversations(prev => {
@@ -153,6 +188,7 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
     }
 
     const id = activeConversation.id
+    conversationRequests.current.delete(id)
     const sequence = ++saveSequence.current
     const isCurrent = () => activeId.current === id && sequence === saveSequence.current
     setDocumentSaveStatus('saving')
@@ -180,6 +216,7 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
       if (!res.ok || !data.success || !conversation) {
         throw new Error(data.error || 'Could not save this document locally.')
       }
+      conversationRequests.current.delete(id)
 
       if (isCurrent()) {
         setActiveConversation(conversation)
@@ -234,6 +271,10 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
         isOpen={isSidebarOpen}
         conversations={conversations}
         activeConversationId={activeConversation?.id}
+        openingId={openingId}
+        openError={openError?.message}
+        onRetryOpen={openError ? () => void handleSelectConversation(openError.conversation) : undefined}
+        onPrefetchConversation={prefetchConversation}
         themes={themes}
         settings={settings}
         apiKeyConfigured={apiKeyConfigured}

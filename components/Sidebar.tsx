@@ -5,7 +5,7 @@ import Image from 'next/image'
 import {
   MessageSquarePlus, MessageSquare, Trash2, Settings, ChevronLeft,
   ChevronRight, FileText, Upload, Key, Check, X, AlertCircle,
-  ChevronDown, ChevronUp, Palette
+  ChevronDown, ChevronUp, Palette, Loader2
 } from 'lucide-react'
 import type { Conversation, DocumentTheme, AppSettings } from '@/types'
 
@@ -13,6 +13,10 @@ interface SidebarProps {
   isOpen: boolean
   conversations: Conversation[]
   activeConversationId?: string
+  openingId: string | null
+  openError?: string
+  onRetryOpen?: () => void
+  onPrefetchConversation: (id: string) => void
   themes: DocumentTheme[]
   settings: AppSettings | null
   apiKeyConfigured: boolean
@@ -28,6 +32,7 @@ interface SidebarProps {
 
 export function Sidebar({
   isOpen, conversations, activeConversationId, themes, settings, apiKeyConfigured,
+  openingId, openError, onRetryOpen, onPrefetchConversation,
   selectedThemeId, onNewConversation, onSelectConversation, onDeleteConversation,
   onToggle, onSettingsUpdate, onThemeUpload, onThemeChange,
 }: SidebarProps) {
@@ -149,30 +154,45 @@ export function Sidebar({
             <p className="text-xs text-gray-400">Start by creating a document</p>
           </div>
         )}
+        {openError && (
+          <div role="alert" className="mx-2 my-1 rounded-lg bg-red-50 p-2 text-xs text-red-700">
+            {openError} <button type="button" onClick={onRetryOpen} className="underline">Retry</button>
+          </div>
+        )}
         {conversations.map(conv => (
           <div
             key={conv.id}
-            onClick={() => onSelectConversation(conv)}
-            className={`group flex items-center gap-2 mx-1 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
+            className={`group flex items-center gap-1 mx-1 pr-2 rounded-lg transition-colors ${
               activeConversationId === conv.id
                 ? 'bg-blue-50 text-blue-700'
                 : 'hover:bg-gray-50 text-gray-700'
             } ${deletingId === conv.id ? 'opacity-50 scale-95 transition-all' : ''}`}
           >
-            <FileText size={14} className={`flex-shrink-0 ${activeConversationId === conv.id ? 'text-blue-500' : 'text-gray-400'}`} />
+            <button type="button" title={conv.title} aria-label={conv.title}
+              aria-current={activeConversationId === conv.id ? 'true' : undefined}
+              aria-busy={openingId === conv.id}
+              onPointerEnter={() => onPrefetchConversation(conv.id)}
+              onFocus={() => onPrefetchConversation(conv.id)}
+              onClick={() => onSelectConversation(conv)}
+              className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left">
+              {openingId === conv.id ? <Loader2 size={14} className="shrink-0 animate-spin" /> :
+                <FileText size={14} className="shrink-0" />}
+              {isOpen && <span className="min-w-0">
+                <span className="block truncate text-xs font-medium">{conv.title}</span>
+                <span className="block text-[10px] text-gray-400">
+                  {openingId === conv.id ? 'Opening…' : formatDate(conv.updatedAt)}
+                </span>
+              </span>}
+            </button>
             {isOpen && (
-              <>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">{conv.title}</p>
-                  <p className="text-[10px] text-gray-400">{formatDate(conv.updatedAt)}</p>
-                </div>
                 <button
+                  type="button"
+                  aria-label={`Delete ${conv.title}`}
                   onClick={(e) => handleDelete(conv.id, e)}
                   className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 hover:text-red-500 text-gray-400 transition-all"
                 >
                   <Trash2 size={12} />
                 </button>
-              </>
             )}
           </div>
         ))}
