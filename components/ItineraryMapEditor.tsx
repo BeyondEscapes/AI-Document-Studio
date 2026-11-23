@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson'
 import { ChevronDown, ChevronUp, Loader2, MapPin, Plus, Route, Upload, X } from 'lucide-react'
@@ -116,8 +116,9 @@ export default function ItineraryMapEditor({
   const [isRouting, setIsRouting] = useState(false)
   const [placing, setPlacing] = useState<number | 'new' | null>(null)
   const [newStopName, setNewStopName] = useState('')
-  const newStopNameRef = useRef(newStopName)
+  const newStopNameRef = useRef('')
   const autoRouteStartedRef = useRef(false)
+  const placementHintId = useId()
 
   useEffect(() => {
     routeStopsRef.current = routeStops
@@ -133,9 +134,36 @@ export default function ItineraryMapEditor({
     onRouteStopsChangeRef.current = onRouteStopsChange
   }, [onRouteStopsChange])
 
-  useEffect(() => {
-    newStopNameRef.current = newStopName
-  }, [newStopName])
+  const cancelPlacement = useCallback(() => {
+    placementRef.current = null
+    setPlacing(null)
+  }, [])
+
+  const placeStop = useCallback((longitude: number, latitude: number) => {
+    const target = placementRef.current
+    if (target === null) return
+    const stops = routeStopsRef.current
+    const coordinates = {
+      latitude: Number(latitude.toFixed(5)),
+      longitude: Number(longitude.toFixed(5)),
+    }
+    const name = newStopNameRef.current.trim() || `Stop ${stops.length + 1}`
+    cancelPlacement()
+    if (target !== 'new' && !stops[target]) return
+    const nextStops = target === 'new'
+      ? [...stops, { name, ...coordinates }]
+      : stops.map((stop, index) => index === target ? { ...stop, ...coordinates } : stop)
+    routeStopsRef.current = nextStops
+    routeCoordinatesSignatureRef.current = JSON.stringify(nextStops.map(stop => [stop.latitude, stop.longitude]))
+    routeGeometryRef.current = null
+    onRouteStopsChangeRef.current(nextStops)
+    if (target === 'new') {
+      newStopNameRef.current = ''
+      setNewStopName('')
+    }
+    setRouteError(null)
+    setRouteMessage(target === 'new' ? `Added ${name} to the route.` : 'Stop location updated.')
+  }, [cancelPlacement])
 
   useEffect(() => {
     let active = true
@@ -200,28 +228,11 @@ export default function ItineraryMapEditor({
           },
           paint: { 'text-color': '#ffffff' },
         })
+        setMapError(null)
         setMapReady(true)
       })
       map.on('click', event => {
-        const target = placementRef.current
-        if (target === null) return
-        const stops = routeStopsRef.current
-        const coordinates = {
-          latitude: Number(event.lngLat.lat.toFixed(5)),
-          longitude: Number(event.lngLat.lng.toFixed(5)),
-        }
-        if (target === 'new') {
-          const name = newStopNameRef.current.trim() || `Stop ${stops.length + 1}`
-          onRouteStopsChangeRef.current([...stops, { name, ...coordinates }])
-          setNewStopName('')
-        } else {
-          onRouteStopsChangeRef.current(stops.map((stop, index) => index === target ? { ...stop, ...coordinates } : stop))
-        }
-        placementRef.current = null
-        setPlacing(null)
-        routeGeometryRef.current = null
-        setRouteError(null)
-        setRouteMessage('Stop location updated. Generate the road route again to include this change.')
+        placeStop(event.lngLat.lng, event.lngLat.lat)
       })
       map.on('error', event => {
         if (!map?.isStyleLoaded()) {
@@ -238,7 +249,7 @@ export default function ItineraryMapEditor({
       mapRef.current = null
       routeSourceRef.current = null
     }
-  }, [])
+  }, [placeStop])
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return
@@ -264,9 +275,22 @@ export default function ItineraryMapEditor({
   }, [routeStops, mapReady])
 
   const beginPlacement = useCallback((target: number | 'new') => {
+    if (!mapReady) return
+    mapRef.current?.stop()
     placementRef.current = target
     setPlacing(target)
-  }, [])
+    mapContainer.current?.scrollIntoView({ block: 'center', inline: 'nearest' })
+  }, [mapReady])
+
+  useEffect(() => {
+    const canvas = mapRef.current?.getCanvas()
+    if (canvas) canvas.style.cursor = placing === null ? '' : 'crosshair'
+  }, [placing])
+
+  function placeAtCenter() {
+    const center = mapRef.current?.getCenter()
+    if (center) placeStop(center.lng, center.lat)
+  }
 
   const updateStopName = (index: number, name: string) => {
     onRouteStopsChange(routeStops.map((stop, stopIndex) =>
@@ -277,6 +301,7 @@ export default function ItineraryMapEditor({
   const moveStop = (index: number, direction: -1 | 1) => {
     const nextIndex = index + direction
     if (nextIndex < 0 || nextIndex >= routeStops.length) return
+    cancelPlacement()
     const reordered = [...routeStops]
     ;[reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]]
     routeGeometryRef.current = null
@@ -285,6 +310,7 @@ export default function ItineraryMapEditor({
   }
 
   const removeStop = (index: number) => {
+    cancelPlacement()
     routeGeometryRef.current = null
     onRouteStopsChange(routeStops.filter((_, stopIndex) => stopIndex !== index))
     setRouteMessage('Stop removed. Generate the road route again to update the map.')
@@ -385,7 +411,8 @@ export default function ItineraryMapEditor({
   }
 
   return (
-    <section className="rounded-xl border border-ui-line bg-ui-tint/40 p-3">
+    <section className="rounded-xl border border-ui-line bg-ui-tint/40 p-3"
+      onKeyDown={event => { if (event.key === 'Escape') cancelPlacement() }}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div>
           <h3 className="text-xs font-semibold text-ui-accent">Sri Lanka road map</h3>
@@ -396,14 +423,21 @@ export default function ItineraryMapEditor({
 
       <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)]">
         <div className="relative overflow-hidden rounded-lg border border-ui-line bg-ui-panel">
-          <div ref={mapContainer} className="mx-auto aspect-[3/4] w-full max-w-[320px]" />
+          <div ref={mapContainer} className="mx-auto aspect-[3/4] w-full max-w-[320px]"
+            aria-describedby={placing !== null ? placementHintId : undefined} />
           {placing !== null && (
-            <div className="absolute left-2 top-2 rounded-md bg-ui-action-hover px-2 py-1 text-[10px] text-white shadow">
-              Click the map to place {placing === 'new' ? 'the new stop' : routeStops[placing]?.name || 'the stop'}
+            <div className="absolute left-2 right-11 top-2 rounded-md bg-ui-panel p-2 text-xs text-ui-body shadow">
+              <p role="status" id={placementHintId}>
+                Click or tap the map to place {placing === 'new' ? 'the new stop' : routeStops[placing]?.name || 'the stop'}.
+              </p>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                <button type="button" onClick={placeAtCenter} className="font-semibold text-ui-accent">Use map center</button>
+                <button type="button" onClick={cancelPlacement} className="text-ui-muted">Cancel</button>
+              </div>
             </div>
           )}
           {mapError && (
-            <div className="absolute inset-x-2 top-2 rounded-md bg-ui-danger-tint p-2 text-[10px] text-ui-danger">
+            <div role="alert" className="pointer-events-none absolute inset-x-2 top-2 rounded-md bg-ui-danger-tint p-2 text-[10px] text-ui-danger">
               {mapError}
             </div>
           )}
@@ -434,7 +468,8 @@ export default function ItineraryMapEditor({
                   <span>{stop.latitude === null || stop.longitude === null
                     ? 'Location not set'
                     : `${stop.latitude.toFixed(4)}, ${stop.longitude.toFixed(4)}`}</span>
-                  <button type="button" onClick={() => beginPlacement(index)} className="font-medium text-ui-accent hover:underline">
+                    <button type="button" onClick={() => beginPlacement(index)} disabled={!mapReady}
+                      className="font-medium text-ui-accent hover:underline">
                     Place on map
                   </button>
                 </div>
@@ -446,19 +481,26 @@ export default function ItineraryMapEditor({
           <div className="flex gap-2">
             <input
               value={newStopName}
-              onChange={event => setNewStopName(event.target.value)}
+              onChange={event => {
+                newStopNameRef.current = event.target.value
+                setNewStopName(event.target.value)
+              }}
               placeholder="New stop name"
+              aria-label="New stop name"
               className="min-w-0 flex-1 rounded-lg border border-ui-line px-2 py-1.5 text-[10px] outline-none focus:border-ui-accent"
             />
-            <button type="button" onClick={() => beginPlacement('new')} disabled={!mapReady} className="inline-flex items-center gap-1 rounded-lg border border-ui-line bg-ui-panel px-2 py-1.5 text-[10px] font-medium text-ui-accent disabled:opacity-50">
-              <Plus size={12} /> Add on map
+            <button type="button" onClick={() => beginPlacement('new')} disabled={!mapReady}
+              className="secondary-button button-compact" aria-pressed={placing === 'new'}>
+              <Plus size={12} /> {placing === 'new' ? 'Pick location' : 'Add on map'}
             </button>
           </div>
         </div>
       </div>
 
       {routeError && <p role="alert" className="mb-2 text-[10px] text-ui-danger">{routeError}</p>}
-      <p className="mb-2 text-[10px] text-ui-muted">{routeMessage}</p>
+      <p role="status" className="mb-2 text-[10px] text-ui-muted">
+        {mapReady ? routeMessage : mapError ? 'Map placement is unavailable. You can upload a map image below.' : 'Loading the map…'}
+      </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={generateRoadRoute} disabled={!mapReady || isRouting} className="primary-button button-compact">
           {isRouting ? <Loader2 size={12} className="animate-spin" /> : <Route size={12} />}
