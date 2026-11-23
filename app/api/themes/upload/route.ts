@@ -4,11 +4,13 @@ import { v4 as uuidv4 } from 'uuid'
 import path from 'path'
 import fs from 'fs'
 import { DATA_DIR } from '@/lib/storage'
+import { getCurrentUser, unauthorized } from '@/lib/auth'
 
 const TEMPLATES_DIR = path.join(DATA_DIR, 'templates')
 
 export async function POST(request: NextRequest) {
   try {
+    if (!await getCurrentUser()) return unauthorized()
     const formData = await request.formData()
     const file = formData.get('template') as File | null
     const name = formData.get('name') as string | null

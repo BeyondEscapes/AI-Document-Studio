@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import {
   FileText, Download, X, Edit3, Eye, EyeOff, FileDown,
   ChevronDown, ChevronUp, Trash2, Plus, AlertCircle,
@@ -19,7 +20,6 @@ import {
 import { getInitialRouteStops } from '@/lib/itinerary-route'
 import { extractItinerarySections, getItineraryPageContent } from '@/lib/itinerary-page-content'
 import { applyDetailLevel, DETAIL_LEVEL_CONFIGS } from '@/lib/itinerary-detail-levels'
-import ItineraryMapEditor from '@/components/ItineraryMapEditor'
 import type {
   DocumentContent,
   DocumentImage,
@@ -32,7 +32,10 @@ import type {
   ItineraryDetailLevel,
 } from '@/types'
 
+const ItineraryMapEditor = dynamic(() => import('@/components/ItineraryMapEditor'), { ssr: false })
+
 interface DocumentWorkspaceProps {
+  startInEdit?: boolean
   documentContent: DocumentContent | null
   themes: DocumentTheme[]
   selectedThemeId: string
@@ -62,9 +65,9 @@ function hasCurrentItineraryMap(content: DocumentContent): boolean {
 
 export function DocumentWorkspace({
   documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate,
-  onSaveDocument, saveStatus, saveError, onClose
+  onSaveDocument, saveStatus, saveError, onClose, startInEdit
 }: DocumentWorkspaceProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('preview')
+  const [viewMode, setViewMode] = useState<ViewMode>(startInEdit ? 'edit' : 'preview')
   const [manualSaveError, setManualSaveError] = useState<string | null>(null)
   const [imageCatalog, setImageCatalog] = useState<ItineraryImageCatalogItem[]>([])
   const [imagePickerSectionId, setImagePickerSectionId] = useState<string | null>(null)
@@ -84,8 +87,10 @@ export function DocumentWorkspace({
     pdfFilename?: string
   }>({ docx: 'idle', pdf: 'idle' })
 
+  const isItinerary = isItineraryDocument(documentContent)
+
   useEffect(() => {
-    if (!isItineraryDocument(documentContent)) {
+    if (!isItinerary) {
       setImageCatalog([])
       setImageStatus(null)
       setImageError(null)
@@ -93,23 +98,23 @@ export function DocumentWorkspace({
       return
     }
 
-    let active = true
+    const controller = new AbortController()
     setIsLoadingImageCatalog(true)
-    fetch('/api/itinerary-images')
+    fetch('/api/itinerary-images', { signal: controller.signal })
       .then(async response => {
         const result = await response.json()
         if (!response.ok) throw new Error(result.error || 'Could not load the itinerary image library.')
-        if (active) setImageCatalog(result.images as ItineraryImageCatalogItem[])
+        if (!controller.signal.aborted) setImageCatalog(result.images as ItineraryImageCatalogItem[])
       })
       .catch(error => {
-        if (active) setImageError(error instanceof Error ? error.message : 'Could not load the image library.')
+        if (!controller.signal.aborted) setImageError(error instanceof Error ? error.message : 'Could not load the image library.')
       })
       .finally(() => {
-        if (active) setIsLoadingImageCatalog(false)
+        if (!controller.signal.aborted) setIsLoadingImageCatalog(false)
       })
 
-    return () => { active = false }
-  }, [documentContent?.documentType, documentContent?.title, documentContent?.itineraryPages])
+    return () => controller.abort()
+  }, [isItinerary])
 
   const handleExport = async (format: 'docx' | 'pdf') => {
     if (!documentContent) return
@@ -438,8 +443,6 @@ export function DocumentWorkspace({
       setIsMatchingImages(false)
     }
   }, [documentContent, imageCatalog, onDocumentUpdate])
-
-  const isItinerary = isItineraryDocument(documentContent)
 
   const bodySections = isItinerary && documentContent
     ? extractItinerarySections(documentContent.sections).remaining
@@ -916,7 +919,7 @@ export function DocumentWorkspace({
           )
         )}
         {viewMode === 'preview' ? (
-          <DocumentPreview documentContent={documentContent} />
+          <div className="studio-paper"><DocumentPreview documentContent={documentContent} /></div>
         ) : (
           <DocumentEditor
             documentContent={documentContent}
@@ -2125,10 +2128,35 @@ function ItineraryImagePicker({
   onClose: () => void
 }) {
   const query = search.trim().toLowerCase()
-  const filteredImages = images
+  const [remote, setRemote] = useState<{ query: string; images: ItineraryImageCatalogItem[] }>()
+  const [limit, setLimit] = useState(24)
+  useEffect(() => {
+    if (!query) return
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/itinerary-images?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const result = await response.json()
+        if (!controller.signal.aborted) setRemote({ query, images: result.images })
+      } catch {
+        // Keep local matches available if remote search is unavailable.
+      }
+    }, 250)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [query])
+  const localMatches = images
     .map(image => ({ image, score: query ? scoreItineraryImage(query, image) : 0 }))
     .filter(({ image, score }) => !query || score > 0 || `${image.title} ${image.sourcePath}`.toLowerCase().includes(query))
     .sort((left, right) => right.score - left.score || left.image.title.localeCompare(right.image.title))
+  const filteredImages = query && remote?.query === query
+    ? remote.images
+    : localMatches.map(({ image }) => image)
 
   return (
     <div
@@ -2156,13 +2184,13 @@ function ItineraryImagePicker({
           <input
             type="search"
             value={search}
-            onChange={event => onSearch(event.target.value)}
+            onChange={event => { setLimit(24); onSearch(event.target.value) }}
             placeholder="Search Colombo, Kandy, Sigiriya..."
             className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
           />
         </label>
         <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-3 pt-0 sm:grid-cols-3">
-          {filteredImages.map(({ image }) => (
+          {filteredImages.slice(0, limit).map(image => (
             <button
               key={image.id}
               type="button"
@@ -2182,6 +2210,12 @@ function ItineraryImagePicker({
           ))}
           {filteredImages.length === 0 && (
             <p className="col-span-full py-10 text-center text-xs text-gray-500">No matching photos found. Upload one from your device in the section editor.</p>
+          )}
+          {filteredImages.length > limit && (
+            <button type="button" onClick={() => setLimit(current => current + 24)}
+              className="col-span-full rounded-lg border border-gray-200 p-2 text-xs text-gray-700">
+              Show more photos
+            </button>
           )}
         </div>
       </section>

@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateDocx, generatePdf, generateFilename, getExportedFile } from '@/lib/export'
+import { generateDocx, generatePdf, generateFilename, sanitizeFilename } from '@/lib/export'
 import { generateBrandedDocx } from '@/lib/docx-template-generator'
 import { addItineraryOpeningPages } from '@/lib/itinerary-opening-pages'
 import { embedCatalogItineraryImages } from '@/lib/itinerary-image-storage'
 import { getTheme, getSettings } from '@/lib/db'
 import path from 'path'
 import type { DocumentContent } from '@/types'
+import { randomUUID } from 'node:crypto'
+import { getCurrentUser, unauthorized } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
     const body = await request.json()
     const { documentContent, themeId, format, filename } = body
 
@@ -20,10 +24,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Format must be "docx" or "pdf"' }, { status: 400 })
     }
 
-    const resolvedContent = embedCatalogItineraryImages(documentContent as DocumentContent)
+    const resolvedContent = await embedCatalogItineraryImages(documentContent as DocumentContent)
     const content = await addItineraryOpeningPages(resolvedContent)
     // Get theme/template
-    const settings = getSettings()
+    const settings = getSettings(user)
     const effectiveThemeId = themeId || settings.defaultThemeId
     const theme = getTheme(effectiveThemeId)
     
@@ -37,10 +41,10 @@ export async function POST(request: NextRequest) {
       templatePath = path.join(process.cwd(), 'assets', 'beyond-escapes-template.docx')
     }
 
+    const docxFilename = typeof filename === 'string' && filename.trim()
+      ? sanitizeFilename(filename.replace(/\.(docx|pdf)$/i, '')) + '.docx'
+      : generateFilename(content, 'docx')
     if (process.env.VERCEL) {
-      const docxFilename = filename
-        ? filename.replace(/\.(docx|pdf)$/, '') + '.docx'
-        : generateFilename(content, 'docx')
       const buffer = await generateBrandedDocx(content, templatePath)
 
       if (format === 'pdf') {
@@ -110,12 +114,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const docxFilename = filename 
-      ? filename.replace(/\.(docx|pdf)$/, '') + '.docx'
-      : generateFilename(content, 'docx')
+    const exportKey = randomUUID()
+    const storageName = (name: string) => `${user.id}_${exportKey}_${name}`
+    const downloadUrl = (name: string) => `/api/export/download?filename=${encodeURIComponent(storageName(name))}`
 
     // Always generate DOCX first
-    const docxResult = await generateDocx(content, templatePath, docxFilename)
+    const docxResult = await generateDocx(content, templatePath, storageName(docxFilename))
     
     if (!docxResult.success || !docxResult.filePath) {
       return NextResponse.json(
@@ -129,13 +133,13 @@ export async function POST(request: NextRequest) {
         success: true,
         filename: docxFilename,
         format: 'docx',
-        downloadUrl: `/api/export/download?filename=${encodeURIComponent(docxFilename)}`,
+        downloadUrl: downloadUrl(docxFilename),
       })
     }
 
     // Generate PDF from DOCX
     const pdfFilename = docxFilename.replace('.docx', '.pdf')
-    const pdfResult = await generatePdf(docxResult.filePath, pdfFilename)
+    const pdfResult = await generatePdf(docxResult.filePath, storageName(pdfFilename))
     
     if (!pdfResult.success) {
       return NextResponse.json(
@@ -143,7 +147,7 @@ export async function POST(request: NextRequest) {
           error: pdfResult.error || 'PDF conversion failed',
           docxAvailable: true,
           docxFilename,
-          docxDownloadUrl: `/api/export/download?filename=${encodeURIComponent(docxFilename)}`,
+          docxDownloadUrl: downloadUrl(docxFilename),
         },
         { status: 500 }
       )
@@ -153,7 +157,7 @@ export async function POST(request: NextRequest) {
       success: true,
       filename: pdfFilename,
       format: 'pdf',
-      downloadUrl: `/api/export/download?filename=${encodeURIComponent(pdfFilename)}`,
+      downloadUrl: downloadUrl(pdfFilename),
     })
 
   } catch (error) {

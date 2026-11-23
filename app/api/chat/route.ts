@@ -4,9 +4,12 @@ import { getDocumentFieldLabel, getMissingRequiredFields, mergeDocumentIntakes }
 import { saveConversation, getConversation, getTheme } from '@/lib/db'
 import { v4 as uuidv4 } from 'uuid'
 import type { ChatMessage, Conversation } from '@/types'
+import { getCurrentUser, unauthorized } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
     // Check API key first
     const apiKeyCheck = checkApiKey()
     if (!apiKeyCheck.configured) {
@@ -28,28 +31,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Load or create conversation
-    let conversation: Conversation
-    if (conversationId) {
-      const existing = getConversation(conversationId)
-      if (existing) {
-        conversation = existing
-      } else {
-        conversation = {
-          id: conversationId,
-          title: 'New Conversation',
-          messages: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-      }
-    } else {
-      conversation = {
-        id: uuidv4(),
-        title: 'New Conversation',
-        messages: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
+    const existing = typeof conversationId === 'string' ? getConversation(conversationId, user) : null
+    if (conversationId && !existing) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+    const previousUpdate = existing?.updatedAt
+    const conversation: Conversation = existing ?? {
+      id: uuidv4(),
+      title: 'New Conversation',
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }
 
     // Build lightweight conversation history for Gemini (excluding system messages)
@@ -160,7 +152,9 @@ export async function POST(request: NextRequest) {
     conversation.updatedAt = new Date().toISOString()
 
     // Save conversation
-    saveConversation(conversation)
+    if (!saveConversation(conversation, user, previousUpdate)) {
+      return NextResponse.json({ error: 'This conversation changed while generating. Reopen it and try again.' }, { status: 409 })
+    }
 
     return NextResponse.json({
       success: true,

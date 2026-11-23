@@ -1,6 +1,7 @@
-import fs from 'fs'
+import { readFile } from 'node:fs/promises'
 import path from 'path'
 import { DATA_DIR } from '@/lib/storage'
+import { readMongoImage } from '@/lib/mongodb-images'
 import type { DocumentContent, DocumentImage } from '@/types'
 
 const IMAGE_DIRECTORIES = [
@@ -8,46 +9,57 @@ const IMAGE_DIRECTORIES = [
   path.join(process.cwd(), 'public', 'itinerary-images'),
 ]
 
-function embedCatalogImage(image: DocumentImage): DocumentImage {
-  if (!image.catalogId || image.src.startsWith('data:image/jpeg;base64,')) return image
-  if (!image.src.startsWith('/api/itinerary-images/')) return image
-  if (!/^[a-f0-9-]{24,36}$/i.test(image.catalogId)) {
-    throw new Error('An itinerary image has an invalid catalog ID.')
+export async function readItineraryImage(id: string): Promise<Buffer | undefined> {
+  if (!/^[a-f0-9-]{24,36}$/i.test(id)) return undefined
+  for (const directory of IMAGE_DIRECTORIES) {
+    try {
+      return await readFile(path.join(directory, `${id}.jpg`))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
   }
-
-  const imagePath = IMAGE_DIRECTORIES
-    .map(directory => path.join(directory, `${image.catalogId}.jpg`))
-    .find(candidate => fs.existsSync(candidate))
-  if (!imagePath) {
-    throw new Error(`The itinerary image "${image.altText}" is missing from local storage. Add it again before exporting.`)
-  }
-
-  const bytes = fs.readFileSync(imagePath)
-  return { ...image, src: `data:image/jpeg;base64,${bytes.toString('base64')}` }
+  return readMongoImage(id)
 }
 
-export function embedCatalogItineraryImages(content: DocumentContent): DocumentContent {
-  const embed = (image?: DocumentImage) => image ? embedCatalogImage(image) : undefined
+export async function embedCatalogItineraryImages(content: DocumentContent): Promise<DocumentContent> {
+  const reads = new Map<string, Promise<Buffer | undefined>>()
+  const embed = async (image: DocumentImage): Promise<DocumentImage> => {
+    if (!image.catalogId || !image.src.startsWith('/api/itinerary-images/')) return image
+    const pending = reads.get(image.catalogId) ?? readItineraryImage(image.catalogId)
+    reads.set(image.catalogId, pending)
+    const bytes = await pending
+    if (!bytes) throw new Error(`The itinerary image "${image.altText}" is missing. Add it again before exporting.`)
+    return { ...image, src: `data:image/jpeg;base64,${bytes.toString('base64')}` }
+  }
+  const optionalImage = (image?: DocumentImage) => image ? embed(image) : undefined
   const pages = content.itineraryPages
+  const [sections, coverImage, closingLogo, mapImage, welcomeArtwork, logo] = await Promise.all([
+    Promise.all(content.sections.map(async section => ({
+      ...section,
+      images: section.images ? await Promise.all(section.images.map(embed)) : undefined,
+    }))),
+    optionalImage(content.coverImage),
+    optionalImage(content.closingLogo),
+    optionalImage(pages?.cover?.mapImage),
+    optionalImage(pages?.cover?.welcomeArtwork),
+    optionalImage(pages?.closing?.logo),
+  ])
 
   return {
     ...content,
-    sections: content.sections.map(section => ({
-      ...section,
-      images: section.images?.map(embedCatalogImage),
-    })),
-    coverImage: embed(content.coverImage),
-    closingLogo: embed(content.closingLogo),
+    sections,
+    coverImage,
+    closingLogo,
     itineraryPages: pages ? {
       ...pages,
       cover: pages.cover ? {
         ...pages.cover,
-        mapImage: embed(pages.cover.mapImage),
-        welcomeArtwork: embed(pages.cover.welcomeArtwork),
+        mapImage,
+        welcomeArtwork,
       } : undefined,
       closing: pages.closing ? {
         ...pages.closing,
-        logo: embed(pages.closing.logo),
+        logo,
       } : undefined,
     } : undefined,
   }

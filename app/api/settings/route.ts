@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSettings, saveSettings } from '@/lib/db'
 import { checkApiKey } from '@/lib/gemini'
+import { getCurrentUser, unauthorized } from '@/lib/auth'
 
 export async function GET() {
   try {
-    const settings = getSettings()
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
+    const settings = getSettings(user)
     const apiKeyStatus = checkApiKey()
     return NextResponse.json({ 
       success: true, 
@@ -18,6 +21,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
     const body = await request.json()
     // Filter to only allowed setting keys
     const allowed = ['defaultThemeId', 'defaultOutputFormats', 'geminiModel', 'language', 'autoSave']
@@ -25,7 +30,7 @@ export async function POST(request: NextRequest) {
     for (const key of allowed) {
       if (key in body) filtered[key] = body[key]
     }
-    saveSettings(filtered)
+    saveSettings(filtered, user)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })

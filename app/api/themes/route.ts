@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getThemes, saveTheme, deleteTheme } from '@/lib/db'
-import { v4 as uuidv4 } from 'uuid'
-import path from 'path'
-import fs from 'fs'
+import { getThemes, deleteTheme } from '@/lib/db'
+import { getCurrentUser, unauthorized } from '@/lib/auth'
 
 export async function GET() {
   try {
+    if (!await getCurrentUser()) return unauthorized()
     const themes = getThemes()
     return NextResponse.json({ success: true, themes })
   } catch (error) {
@@ -15,6 +14,9 @@ export async function GET() {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
+    if (user.role !== 'admin') return NextResponse.json({ error: 'Administrator access required.' }, { status: 403 })
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'Theme ID required' }, { status: 400 })

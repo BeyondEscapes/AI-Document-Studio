@@ -2,7 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 
-export const DATA_DIR = process.env.VERCEL
+export const DATA_DIR = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : process.env.VERCEL
   ? path.join(os.tmpdir(), 'ai-document-studio')
   : path.join(process.cwd(), 'data')
 

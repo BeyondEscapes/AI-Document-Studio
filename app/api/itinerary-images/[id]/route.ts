@@ -1,31 +1,29 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-import { DATA_DIR } from '@/lib/storage'
-
-const USER_IMAGE_DIRECTORY = path.join(DATA_DIR, 'itinerary-images')
-const SHIPPED_IMAGE_DIRECTORY = path.join(process.cwd(), 'public', 'itinerary-images')
+import { readItineraryImage } from '@/lib/itinerary-image-storage'
+import { getCurrentUser, unauthorized } from '@/lib/auth'
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!await getCurrentUser()) return unauthorized()
   const { id } = await params
   if (!/^[a-f0-9-]{24,36}$/i.test(id)) {
     return NextResponse.json({ error: 'Image not found.' }, { status: 404 })
   }
 
-  const userImagePath = path.join(USER_IMAGE_DIRECTORY, `${id}.jpg`)
-  const shippedImagePath = path.join(SHIPPED_IMAGE_DIRECTORY, `${id}.jpg`)
-  const imagePath = fs.existsSync(userImagePath) ? userImagePath : shippedImagePath
-  if (!fs.existsSync(imagePath)) {
+  const bytes = await readItineraryImage(id).catch(() => null)
+  if (bytes === null) {
+    return NextResponse.json({ error: 'Image storage is unavailable.' }, { status: 503 })
+  }
+  if (!bytes) {
     return NextResponse.json({ error: 'Image not found.' }, { status: 404 })
   }
 
-  return new NextResponse(fs.readFileSync(imagePath), {
+  return new NextResponse(new Uint8Array(bytes), {
     headers: {
       'Content-Type': 'image/jpeg',
-      'Cache-Control': 'private, max-age=3600',
+      'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     },
   })

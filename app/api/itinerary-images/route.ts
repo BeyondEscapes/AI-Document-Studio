@@ -4,14 +4,17 @@ import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
 import { DATA_DIR } from '@/lib/storage'
+import { listMongoImages, saveMongoImage, searchMongoImages } from '@/lib/mongodb-images'
+import { scoreItineraryImage } from '@/lib/itinerary-images'
+import { getCurrentUser, unauthorized } from '@/lib/auth'
 import type { ItineraryImageCatalogItem } from '@/types'
 
 export const runtime = 'nodejs'
 
 const IMAGE_DIRECTORY = path.join(DATA_DIR, 'itinerary-images')
 const CATALOG_PATH = path.join(IMAGE_DIRECTORY, 'catalog.json')
-const SHIPPED_IMAGE_DIRECTORY = path.join(process.cwd(), 'public', 'itinerary-images')
-const SHIPPED_CATALOG_PATH = path.join(SHIPPED_IMAGE_DIRECTORY, 'catalog.json')
+const SHIPPED_CATALOG_PATH = path.join(process.cwd(), 'public', 'itinerary-images', 'catalog.json')
+let shippedCatalog: ItineraryImageCatalogItem[] | undefined
 const MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 
 function readCatalogAt(catalogPath: string): ItineraryImageCatalogItem[] {
@@ -22,11 +25,13 @@ function readCatalogAt(catalogPath: string): ItineraryImageCatalogItem[] {
   return catalog as ItineraryImageCatalogItem[]
 }
 
-function readCatalog(): ItineraryImageCatalogItem[] {
+async function readCatalog(): Promise<ItineraryImageCatalogItem[]> {
   const catalog = new Map(
-    readCatalogAt(SHIPPED_CATALOG_PATH).map(image => [image.id, image])
+    (shippedCatalog ??= readCatalogAt(SHIPPED_CATALOG_PATH)).map(image => [image.id, image])
   )
   for (const image of readCatalogAt(CATALOG_PATH)) catalog.set(image.id, image)
+  const uploads = await listMongoImages().catch(() => [])
+  for (const image of uploads) catalog.set(image.id, image)
   return [...catalog.values()]
 }
 
@@ -39,10 +44,18 @@ function writeCatalog(catalog: ItineraryImageCatalogItem[]): void {
 
 export async function GET(request: NextRequest) {
   try {
-    const query = request.nextUrl.searchParams.get('q')?.trim().toLowerCase()
-    const images = readCatalog()
+    if (!await getCurrentUser()) return unauthorized()
+    const query = request.nextUrl.searchParams.get('q')?.trim().toLowerCase().slice(0, 160)
+    const [images, ranked] = await Promise.all([
+      readCatalog(),
+      query ? searchMongoImages(query).catch(() => []) : [],
+    ])
     const filtered = query
-      ? images.filter(image => `${image.title} ${image.sourcePath}`.toLowerCase().includes(query))
+      ? [...new Map([
+        ...ranked,
+        ...images.filter(image => scoreItineraryImage(query, image) > 0 ||
+          `${image.title} ${image.sourcePath}`.toLowerCase().includes(query)),
+      ].map(image => [image.id, image])).values()]
       : images
     return NextResponse.json({ success: true, images: filtered })
   } catch (error) {
@@ -53,6 +66,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!await getCurrentUser()) return unauthorized()
     const formData = await request.formData()
     const file = formData.get('image')
     if (!(file instanceof File)) {
@@ -72,7 +86,6 @@ export async function POST(request: NextRequest) {
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer({ resolveWithObject: true })
 
-    const catalog = readCatalogAt(CATALOG_PATH)
     const id = crypto.randomUUID()
     const safeName = path.basename(file.name).replace(/[\u0000-\u001f]/g, '').slice(0, 160) || 'Uploaded image'
     const item: ItineraryImageCatalogItem = {
@@ -85,14 +98,16 @@ export async function POST(request: NextRequest) {
       height: result.info.height,
     }
 
-    fs.mkdirSync(IMAGE_DIRECTORY, { recursive: true })
-    fs.writeFileSync(path.join(IMAGE_DIRECTORY, `${id}.jpg`), result.data)
-    writeCatalog([item, ...catalog])
+    if (!await saveMongoImage(item, result.data)) {
+      const catalog = readCatalogAt(CATALOG_PATH)
+      fs.mkdirSync(IMAGE_DIRECTORY, { recursive: true })
+      fs.writeFileSync(path.join(IMAGE_DIRECTORY, `${id}.jpg`), result.data)
+      writeCatalog([item, ...catalog])
+    }
 
     return NextResponse.json({ success: true, image: item }, { status: 201 })
   } catch (error) {
     console.error('Could not upload itinerary image:', error)
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: `Could not upload image: ${message}` }, { status: 500 })
+    return NextResponse.json({ error: 'Could not save the image.' }, { status: 500 })
   }
 }

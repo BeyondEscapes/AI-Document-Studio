@@ -122,6 +122,18 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)** (automa
 
 Alternatively, double-click **`start.bat`** in the project folder to start with one click!
 
+### Accounts and saved documents
+
+Create an account at `/signup`. Signed-in users can create, edit, approve, export, and delete their saved documents from `/documents`. Removing a saved document keeps the conversation text in the studio. The theme switch remembers the selected appearance in the current browser.
+
+To grant administrator access, create the account first and run the following command on the machine hosting the database:
+
+```powershell
+npm run promote-admin -- name@example.com
+```
+
+Administrators can open `/admin` to review users and manage team documents. Pre-existing local conversations and documents appear as unassigned to administrators. Accounts, sessions, and saved documents use the studio’s SQLite database. For hosted use, point `STUDIO_DATA_DIR` at a persistent, writable volume shared with the admin command.
+
 ### Optional: Import an Itinerary Photo Library
 
 To add or refresh the bundled destination library, import only the JPEG photos from the supplied ZIP. The importer skips PSDs and documents and optimizes the photos into `public/itinerary-images/` so they are available to every app instance:
@@ -130,7 +142,13 @@ To add or refresh the bundled destination library, import only the JPEG photos f
 npm run import:itinerary-images -- --zip "C:\path\to\Itinerary images.zip"
 ```
 
-Itineraries automatically attach confident location matches when opened. You can also use **Auto-match locations**, choose another photo from the library, or add a JPEG, PNG, or WebP image from your device in the section editor. Selected image data is included in each saved document and its exports; device uploads remain local.
+Itineraries automatically attach confident location matches when opened. You can also use **Auto-match locations**, choose another photo from the library, or add a JPEG, PNG, or WebP image from your device in the section editor. Saved documents reference catalog photos, and exports embed the selected image data.
+
+### MongoDB photo storage and search
+
+Set `MONGODB_URI` in `.env.local` or your deployment environment to store new itinerary photo uploads in Atlas. The default database is `doc_theme`. The uploader stores an optimized JPEG and searchable metadata in `itinerary_images`. Existing local uploads remain accessible on the machine that holds them.
+
+Run `npm run setup:image-search` with Node.js 22.18 or later to add the bundled photo metadata to Atlas and create its vector index. Run it again after adding photos to the bundled catalog. Searches rank photos by title and source-path terms using vectors, with keyword matches available while the index builds. SQLite continues to store conversations, settings, and themes.
 
 ---
 
