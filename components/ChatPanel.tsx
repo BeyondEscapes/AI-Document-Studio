@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Send, FileText, RefreshCw, AlertCircle, Sparkles, ChevronRight, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback, useId } from 'react'
+import {
+  Send, FileText, RefreshCw, AlertCircle, Sparkles, ChevronRight, ExternalLink,
+  Camera, Compass, MapPin, Mountain, Palmtree, Plane, Route, Sailboat, Ticket, Waves,
+} from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel } from '@/lib/business-documents'
 import type { Conversation, ChatMessage, DocumentContent, AppSettings } from '@/types'
 
@@ -179,69 +182,72 @@ export function ChatPanel({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto">
-        {isEmptyConversation ? (
-          <div className="flex min-h-full flex-col items-center justify-center px-6 py-8">
-            {/* Welcome */}
-            <div className="w-14 h-14 bg-ui-action rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-              <Sparkles size={24} className="text-white" />
-            </div>
-            <h2 className="text-xl font-semibold text-ui-body mb-2">
-              AI Document Studio
-            </h2>
-            <p className="text-sm text-ui-muted text-center max-w-sm mb-6">
-              Describe the document you need. The same AI chat creates travel documents and business paperwork using Beyond Escapes templates.
-            </p>
+      <div className="chat-canvas relative isolate min-h-0 flex-1">
+        <ChatWallpaper />
+        <div className="relative h-full overflow-y-auto">
+          {isEmptyConversation ? (
+            <div className="flex min-h-full flex-col items-center justify-center px-6 py-8">
+              {/* Welcome */}
+              <div className="w-14 h-14 bg-ui-action rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                <Sparkles size={24} className="text-white" />
+              </div>
+              <h2 className="text-xl font-semibold text-ui-body mb-2">
+                AI Document Studio
+              </h2>
+              <p className="text-sm text-ui-muted text-center max-w-sm mb-6">
+                Describe the document you need. The same AI chat creates travel documents and business paperwork using Beyond Escapes templates.
+              </p>
 
-            {!apiKeyConfigured && (
-              <div className="w-full max-w-sm mb-6 p-4 bg-ui-warning-tint border border-ui-warning-tint rounded-xl">
-                <div className="flex items-start gap-2">
-                  <AlertCircle size={16} className="text-ui-warning mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-ui-warning">API Key Required</p>
-                    <p className="text-xs text-ui-warning mt-1">
-                      Add your Gemini API key to <code className="bg-ui-warning-tint px-1 rounded">.env.local</code>:
-                    </p>
-                    <code className="block text-xs mt-1 bg-ui-warning-tint p-2 rounded text-ui-warning">
-                      GEMINI_API_KEY=your_key_here
-                    </code>
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-ui-warning hover:text-ui-warning mt-1 underline"
-                    >
-                      Get a free API key <ExternalLink size={10} />
-                    </a>
+              {!apiKeyConfigured && (
+                <div className="w-full max-w-sm mb-6 p-4 bg-ui-warning-tint border border-ui-warning-tint rounded-xl">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={16} className="text-ui-warning mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-ui-warning">API Key Required</p>
+                      <p className="text-xs text-ui-warning mt-1">
+                        Add your Gemini API key to <code className="bg-ui-warning-tint px-1 rounded">.env.local</code>:
+                      </p>
+                      <code className="block text-xs mt-1 bg-ui-warning-tint p-2 rounded text-ui-warning">
+                        GEMINI_API_KEY=your_key_here
+                      </code>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-ui-warning hover:text-ui-warning mt-1 underline"
+                      >
+                        Get a free API key <ExternalLink size={10} />
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Quick Prompts */}
-            <div className="w-full max-w-sm space-y-2">
-              <p className="text-xs font-medium text-ui-muted mb-2">Quick start:</p>
-              {QUICK_PROMPTS.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSubmit(prompt)}
-                  disabled={!apiKeyConfigured || isLoading}
-                  className="w-full text-left px-3 py-2.5 rounded-xl border border-ui-line hover:border-ui-accent hover:bg-ui-tint text-xs text-ui-muted hover:text-ui-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 group"
-                >
-                  <ChevronRight size={12} className="text-ui-muted group-hover:text-ui-accent flex-shrink-0" />
-                  <span>{prompt}</span>
-                </button>
-              ))}
+              {/* Quick Prompts */}
+              <div className="w-full max-w-sm space-y-2">
+                <p className="text-xs font-medium text-ui-muted mb-2">Quick start:</p>
+                {QUICK_PROMPTS.map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSubmit(prompt)}
+                    disabled={!apiKeyConfigured || isLoading}
+                    className="w-full text-left px-3 py-2.5 rounded-xl border border-ui-line bg-ui-panel hover:border-ui-accent hover:bg-ui-tint text-xs text-ui-muted hover:text-ui-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 group"
+                  >
+                    <ChevronRight size={12} className="text-ui-muted group-hover:text-ui-accent flex-shrink-0" />
+                    <span>{prompt}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="px-4 py-4 space-y-4">
-            {messages.map((msg) => (
-              <ChatMessageBubble key={msg.id} message={msg} onViewDocument={onToggleDocPanel} />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
+          ) : (
+            <div className="px-4 py-4 space-y-4">
+              {messages.map((msg) => (
+                <ChatMessageBubble key={msg.id} message={msg} onViewDocument={onToggleDocPanel} />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Error Message */}
@@ -266,7 +272,7 @@ export function ChatPanel({
             placeholder="Ask for a reservation, voucher, itinerary, invoice, confirmation, letter, or another business document..."
             rows={1}
             disabled={isLoading}
-            className="flex-1 bg-transparent text-sm text-ui-body placeholder-ui-muted resize-none outline-none min-h-[36px] max-h-40 py-1 disabled:opacity-50"
+            className="min-w-0 flex-1 bg-transparent text-sm text-ui-body placeholder-ui-muted resize-none outline-none min-h-[36px] max-h-40 py-1 disabled:opacity-50"
             style={{ scrollbarWidth: 'none' }}
           />
           <button
@@ -286,6 +292,34 @@ export function ChatPanel({
         </p>
       </div>
     </div>
+  )
+}
+
+function ChatWallpaper() {
+  const patternId = useId()
+
+  return (
+    <svg aria-hidden="true" focusable="false" className="chat-wallpaper">
+      <defs>
+        <pattern id={patternId} width="236" height="208" patternUnits="userSpaceOnUse">
+          <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <Plane x={20} y={25} size={25} strokeWidth={1.25} />
+            <Compass x={101} y={12} size={23} strokeWidth={1.25} />
+            <Palmtree x={183} y={32} size={26} strokeWidth={1.25} />
+            <Ticket x={60} y={68} size={23} strokeWidth={1.25} />
+            <Mountain x={143} y={77} size={27} strokeWidth={1.25} />
+            <Sailboat x={17} y={120} size={25} strokeWidth={1.25} />
+            <MapPin x={99} y={121} size={21} strokeWidth={1.25} />
+            <Camera x={197} y={126} size={23} strokeWidth={1.25} />
+            <Waves x={57} y={170} size={26} strokeWidth={1.25} />
+            <Route x={153} y={168} size={24} strokeWidth={1.25} />
+            <path d="M69 32h6m-3-3v6M129 52h6m-3-3v6M205 90h6m-3-3v6M54 143h6m-3-3v6M116 183h6m-3-3v6M21 188h6m-3-3v6" />
+            <path d="M26 80h.1M91 102h.1M165 19h.1M162 137h.1M207 181h.1M223 59h.1" strokeWidth="3" />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
   )
 }
 

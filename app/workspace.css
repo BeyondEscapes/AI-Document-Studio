@@ -53,6 +53,28 @@
   color: var(--studio-text);
 }
 
+.chat-canvas {
+  --chat-wallpaper-ink: #23695e;
+  --chat-wallpaper-opacity: .14;
+  background: radial-gradient(ellipse at 18% 8%, var(--studio-accent-tint), transparent 74%), var(--studio-bg);
+}
+
+.chat-wallpaper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--chat-wallpaper-ink);
+  opacity: var(--chat-wallpaper-opacity);
+  pointer-events: none;
+}
+
+[data-theme="dark"] .chat-canvas {
+  --chat-wallpaper-ink: #a4cfc8;
+  --chat-wallpaper-opacity: .13;
+  background: radial-gradient(ellipse at 18% 8%, #203837, transparent 74%), var(--studio-bg);
+}
+
 .workspace-header {
   z-index: 5;
   position: relative;
