@@ -8,7 +8,7 @@ import { ThemeToggle } from './ThemeToggle'
 
 const destinations = [
   { name: 'Sri Lanka’s south coast', asset: '/images/auth-coast-hd.webp' },
-  { name: 'Sigiriya, Sri Lanka', asset: '/images/auth-sigiriya-rock.webp' },
+  { name: 'Sigiriya, Sri Lanka', asset: '/images/auth-sigiriya-hd.webp' },
 ]
 
 export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
@@ -43,7 +43,7 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
     <main className="auth-screen">
       <aside className="auth-visual" aria-label={destination.name}>
         <Image key={destination.asset} src={destination.asset} alt="" fill preload
-          sizes={currentPhoto === 0 ? '(max-width: 760px) max(100vw, 620px), max(53vw, 240dvh)' : '(max-width: 760px) 100vw, 53vw'} />
+          sizes="(max-width: 760px) max(100vw, 620px), max(53vw, 240dvh)" />
         <div className="auth-visual-shade" />
         <div className="auth-visual-inner">
           <Image className="auth-logo" src="/images/beyond_escapes_logo_white.png" alt="Beyond Escapes" width={218} height={42} />
