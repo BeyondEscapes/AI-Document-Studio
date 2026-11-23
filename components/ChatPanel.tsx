@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useId } from 'react'
 import {
   Send, FileText, RefreshCw, AlertCircle, Sparkles, ChevronRight, ExternalLink,
-  Camera, Compass, MapPin, Mountain, Palmtree, Plane, Route, Sailboat, Ticket, Waves,
+  BedDouble, Bus, Camera, Compass, Mail, MapPin, Mountain, Palmtree, Plane, ReceiptText, Route, Sailboat, Ticket, Users, Waves,
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel } from '@/lib/business-documents'
 import type { Conversation, ChatMessage, DocumentContent, AppSettings } from '@/types'
@@ -19,13 +19,13 @@ interface ChatPanelProps {
 }
 
 const QUICK_PROMPTS = [
-  'Create a 5-day Sri Lanka itinerary from Colombo to Kandy to Bentota',
-  'Create a room reservation using the hotel and guest details I provide',
-  'Prepare a hotel voucher from my confirmed booking details',
-  'Create an invoice from the line items, amounts, currency, and date I provide',
-  'Prepare a transport confirmation using my service and booking details',
-  'Create a rooming list from the guest names and room assignments I provide',
-  'Write a business letter using the recipient and key points I provide',
+  { label: 'Tour itinerary', detail: 'Plan a Sri Lanka trip', icon: Route, prompt: 'Create a 5-day Sri Lanka itinerary from Colombo to Kandy to Bentota' },
+  { label: 'Room reservation', detail: 'Arrange a hotel stay', icon: BedDouble, prompt: 'Create a room reservation using the hotel and guest details I provide' },
+  { label: 'Hotel voucher', detail: 'Confirm a booking', icon: Ticket, prompt: 'Prepare a hotel voucher from my confirmed booking details' },
+  { label: 'Invoice', detail: 'Bill for services', icon: ReceiptText, prompt: 'Create an invoice from the line items, amounts, currency, and date I provide' },
+  { label: 'Transport', detail: 'Confirm a transfer', icon: Bus, prompt: 'Prepare a transport confirmation using my service and booking details' },
+  { label: 'Rooming list', detail: 'Organize guest rooms', icon: Users, prompt: 'Create a rooming list from the guest names and room assignments I provide' },
+  { label: 'Business letter', detail: 'Draft correspondence', icon: Mail, prompt: 'Write a business letter using the recipient and key points I provide' },
 ]
 
 export function ChatPanel({
@@ -149,7 +149,7 @@ export function ChatPanel({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       handleSubmit()
     }
@@ -160,7 +160,7 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full bg-ui-panel">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-ui-line h-14">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-ui-line px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <Sparkles size={16} className="shrink-0 text-ui-accent" />
           <h1 className="truncate text-sm font-semibold text-ui-body">
@@ -186,17 +186,12 @@ export function ChatPanel({
         <ChatWallpaper />
         <div className="relative h-full overflow-y-auto">
           {isEmptyConversation ? (
-            <div className="flex min-h-full flex-col items-center justify-center px-6 py-8">
-              {/* Welcome */}
-              <div className="w-14 h-14 bg-ui-action rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                <Sparkles size={24} className="text-white" />
+            <div className="flex min-h-full flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-9">
+              <div className="chat-start-heading">
+                <span className="document-symbol"><Sparkles size={22} aria-hidden="true" /></span>
+                <h2>What would you like to create?</h2>
+                <p>Choose a document type or describe what you need in the chat.</p>
               </div>
-              <h2 className="text-xl font-semibold text-ui-body mb-2">
-                AI Document Studio
-              </h2>
-              <p className="text-sm text-ui-muted text-center max-w-sm mb-6">
-                Describe the document you need. The same AI chat creates travel documents and business paperwork using Beyond Escapes templates.
-              </p>
 
               {!apiKeyConfigured && (
                 <div className="w-full max-w-sm mb-6 p-4 bg-ui-warning-tint border border-ui-warning-tint rounded-xl">
@@ -224,23 +219,24 @@ export function ChatPanel({
               )}
 
               {/* Quick Prompts */}
-              <div className="w-full max-w-sm space-y-2">
-                <p className="text-xs font-medium text-ui-muted mb-2">Quick start:</p>
-                {QUICK_PROMPTS.map((prompt, i) => (
+              <div className="chat-quick-start" role="group" aria-label="Quick start">
+                {QUICK_PROMPTS.map(({ label, detail, icon: Icon, prompt }) => (
                   <button
-                    key={i}
+                    key={label}
+                    type="button"
                     onClick={() => handleSubmit(prompt)}
                     disabled={!apiKeyConfigured || isLoading}
-                    className="w-full text-left px-3 py-2.5 rounded-xl border border-ui-line bg-ui-panel hover:border-ui-accent hover:bg-ui-tint text-xs text-ui-muted hover:text-ui-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 group"
+                    className="chat-prompt"
                   >
-                    <ChevronRight size={12} className="text-ui-muted group-hover:text-ui-accent flex-shrink-0" />
-                    <span>{prompt}</span>
+                    <Icon size={17} className="shrink-0 text-ui-accent" aria-hidden="true" />
+                    <span><strong>{label}</strong><small>{detail}</small></span>
+                    <ChevronRight size={14} className="ml-auto shrink-0 text-ui-muted" aria-hidden="true" />
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="px-4 py-4 space-y-4">
+            <div className="mx-auto max-w-4xl space-y-4 px-4 py-5">
               {messages.map((msg) => (
                 <ChatMessageBubble key={msg.id} message={msg} onViewDocument={onToggleDocPanel} />
               ))}
@@ -252,32 +248,36 @@ export function ChatPanel({
 
       {/* Error Message */}
       {error && (
-        <div className="mx-4 mb-2 p-3 bg-ui-danger-tint border border-ui-danger-tint rounded-xl flex items-start gap-2">
+        <div role="alert" className="mx-4 mb-2 flex items-start gap-2 rounded-xl border border-ui-danger-tint bg-ui-danger-tint p-3">
           <AlertCircle size={14} className="text-ui-danger mt-0.5 flex-shrink-0" />
           <p className="text-xs text-ui-danger">{error}</p>
-          <button onClick={() => setError(null)} className="ml-auto text-ui-danger hover:text-ui-danger">
+          <button type="button" onClick={() => setError(null)} aria-label="Dismiss error" className="ml-auto px-1 text-ui-danger">
             ×
           </button>
         </div>
       )}
 
       {/* Input Area */}
-      <div className="px-4 pb-4 pt-2 border-t border-ui-line">
-        <div className="relative flex items-end gap-2 bg-ui-canvas border border-ui-line rounded-xl px-3 py-2 focus-within:border-ui-accent focus-within:ring-2 focus-within:ring-ui-line">
+      <div className="shrink-0 border-t border-ui-line px-3 pb-2 pt-2 sm:px-4">
+        <div className="mx-auto flex max-w-4xl items-end gap-2 rounded-xl border border-ui-line bg-ui-canvas px-2.5 py-1.5 focus-within:border-ui-accent focus-within:ring-2 focus-within:ring-ui-line">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => { setInput(e.target.value); autoResizeTextarea() }}
             onKeyDown={handleKeyDown}
-            placeholder="Ask for a reservation, voucher, itinerary, invoice, confirmation, letter, or another business document..."
+            aria-label="Message Document Studio"
+            placeholder="Describe the document you need…"
             rows={1}
             disabled={isLoading}
             className="min-w-0 flex-1 bg-transparent text-sm text-ui-body placeholder-ui-muted resize-none outline-none min-h-[36px] max-h-40 py-1 disabled:opacity-50"
             style={{ scrollbarWidth: 'none' }}
           />
           <button
+            type="button"
             onClick={() => handleSubmit()}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !apiKeyConfigured}
+            aria-label="Send message"
+            title="Send message"
             className="primary-button button-square shrink-0"
           >
             {isLoading ? (
@@ -287,8 +287,8 @@ export function ChatPanel({
             )}
           </button>
         </div>
-        <p className="text-[10px] text-ui-muted mt-1.5 text-center">
-          Press Enter to send • Shift+Enter for new line
+        <p className="chat-composer-hint mt-1 text-center text-[11px] text-ui-muted">
+          <kbd>Enter</kbd> to send <span aria-hidden="true">·</span> <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line
         </p>
       </div>
     </div>

@@ -93,7 +93,7 @@ export function Sidebar({
 
   return (
     <div className={`flex flex-col bg-ui-panel border-r border-ui-line transition-[width] duration-300 ${isOpen ? 'w-72' : 'w-14'} flex-shrink-0`}>
-      <div className="flex items-center justify-between p-3 border-b border-ui-line h-14">
+      <div className={`flex h-14 shrink-0 items-center border-b border-ui-line ${isOpen ? 'justify-between px-3' : 'justify-center'}`}>
         {isOpen && <span className="text-sm font-semibold text-ui-body">Workspace</span>}
         <button
           type="button"
@@ -107,9 +107,10 @@ export function Sidebar({
       </div>
 
       {/* New Chat Button */}
-      <div className="p-2">
+      <div className="flex justify-center p-2">
         <button
           onClick={onNewConversation}
+          aria-label="New document"
           className={`primary-button w-full ${!isOpen ? 'button-square' : ''}`}
           title="New conversation"
         >
@@ -153,7 +154,7 @@ export function Sidebar({
         {conversations.map(conv => (
           <div
             key={conv.id}
-            className={`group flex items-center gap-1 mx-1 pr-2 rounded-lg transition-colors ${
+            className={`group mx-1 flex items-center gap-1 rounded-lg transition-colors ${isOpen ? 'pr-2' : ''} ${
               activeConversationId === conv.id
                 ? 'bg-ui-tint text-ui-accent'
                 : 'hover:bg-ui-canvas text-ui-muted'
@@ -165,7 +166,7 @@ export function Sidebar({
               onPointerEnter={() => onPrefetchConversation(conv.id)}
               onFocus={() => onPrefetchConversation(conv.id)}
               onClick={() => onSelectConversation(conv)}
-              className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left">
+              className={`flex min-w-0 flex-1 items-center gap-2 text-left ${isOpen ? 'px-2 py-2' : 'h-10 justify-center'}`}>
               {openingId === conv.id ? <Loader2 size={14} className="shrink-0 animate-spin" /> :
                 <FileText size={14} className="shrink-0" />}
               {isOpen && <span className="min-w-0">
@@ -333,7 +334,7 @@ export function Sidebar({
         {/* Collapsed icons */}
         {!isOpen && (
           <div className="flex flex-col items-center gap-1 p-2">
-            <button onClick={() => { onToggle(); setShowSettings(true) }} className="p-2 rounded-lg hover:bg-ui-subtle text-ui-muted" title="Settings">
+            <button type="button" onClick={() => { onToggle(); setShowSettings(true) }} className="icon-button" aria-label="Settings" title="Settings">
               <Settings size={16} />
             </button>
           </div>
