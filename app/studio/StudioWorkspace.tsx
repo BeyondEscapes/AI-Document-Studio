@@ -7,7 +7,10 @@ import { DocumentWorkspace } from '@/components/DocumentWorkspace'
 import { prepareDocumentForLocalSave } from '@/lib/itinerary-images'
 import type { Conversation, DocumentContent, DocumentTheme, AppSettings } from '@/types'
 
-export default function StudioWorkspace({ initialConversation }: { initialConversation: Conversation | null }) {
+export default function StudioWorkspace({ initialConversation, cloudDocuments }: {
+  initialConversation: Conversation | null
+  cloudDocuments: boolean
+}) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(initialConversation)
   const [documentContent, setDocumentContent] = useState<DocumentContent | null>(initialConversation?.documentContent ?? null)
@@ -181,7 +184,7 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
     }
   }, [])
 
-  const persistDocument = useCallback(async (content: DocumentContent) => {
+  const persistDocument = useCallback(async (content: DocumentContent, recoverMissing = false) => {
     if (!activeConversation) {
       setDocumentSaveStatus('error')
       throw new Error('Start a conversation before saving a document.')
@@ -194,35 +197,48 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
     setDocumentSaveStatus('saving')
     setDocumentSaveError(null)
     const save = pendingSave.current.catch(() => undefined).then(async () => {
-      const res = await fetch(`/api/conversations/${activeConversation.id}`, {
+      const documentContent = prepareDocumentForLocalSave(content)
+      let res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          documentContent: prepareDocumentForLocalSave(content),
+          documentContent,
           selectedTheme: selectedThemeId,
         }),
       })
+      if (res.status === 404 && recoverMissing && isCurrent()) {
+        res = await fetch('/api/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: (content.title.trim() || 'Untitled document').slice(0, 160),
+            documentContent,
+            selectedTheme: selectedThemeId,
+          }),
+        })
+      }
       const responseText = await res.text()
       let data: { success?: boolean; error?: string; conversation?: Conversation }
       try {
         data = JSON.parse(responseText)
       } catch {
         if (res.status === 413) {
-          throw new Error('The local server rejected this document as too large. Remove oversized embedded cover images and retry.')
+          throw new Error('This document is too large to save. Remove oversized embedded cover images and retry.')
         }
-        throw new Error(`Could not save this document locally (HTTP ${res.status}).`)
+        throw new Error(`Could not save this document (HTTP ${res.status}).`)
       }
       const conversation = data.conversation
       if (!res.ok || !data.success || !conversation) {
-        throw new Error(data.error || 'Could not save this document locally.')
+        throw new Error(res.status === 404
+          ? 'This conversation could not be found. Choose Save document to recover a copy of the open document.'
+          : data.error || 'Could not save this document.')
       }
       conversationRequests.current.delete(id)
 
       if (isCurrent()) {
+        activeId.current = conversation.id
         setActiveConversation(conversation)
-        setConversations(prev => prev.map(item =>
-          item.id === conversation.id ? conversation : item
-        ))
+        setConversations(prev => [conversation, ...prev.filter(item => item.id !== conversation.id && item.id !== id)])
         setDocumentSaveStatus('saved')
       }
     })
@@ -232,7 +248,7 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
     } catch (err) {
       if (isCurrent()) {
         setDocumentSaveStatus('error')
-        setDocumentSaveError(err instanceof Error ? err.message : 'Could not save this document locally.')
+        setDocumentSaveError(err instanceof Error ? err.message : 'Could not save this document.')
       }
       throw err
     }
@@ -240,12 +256,12 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
 
   const handleDocumentUpdate = useCallback((content: DocumentContent) => {
     setDocumentContent(content)
-    void persistDocument(content).catch(err => console.error('Failed to save document locally:', err))
+    void persistDocument(content).catch(err => console.error('Failed to save document:', err))
   }, [persistDocument])
 
   const handleSaveDocument = useCallback(async () => {
-    if (documentContent) await persistDocument(documentContent)
-  }, [documentContent, persistDocument])
+    if (documentContent) await persistDocument(documentContent, cloudDocuments)
+  }, [cloudDocuments, documentContent, persistDocument])
 
   const handleSettingsUpdate = useCallback(async (newSettings: Partial<AppSettings>) => {
     try {
@@ -317,6 +333,7 @@ export default function StudioWorkspace({ initialConversation }: { initialConver
               onSaveDocument={handleSaveDocument}
               saveStatus={documentSaveStatus}
               saveError={documentSaveError}
+              cloudDocuments={cloudDocuments}
               onClose={() => setIsDocPanelOpen(false)}
             />
           </div>

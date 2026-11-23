@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocumentContent, checkApiKey, normalizeModel } from '@/lib/gemini'
 import { getDocumentFieldLabel, getMissingRequiredFields, mergeDocumentIntakes } from '@/lib/business-documents'
-import { saveConversation, getConversation, getTheme } from '@/lib/db'
+import { getTheme } from '@/lib/db'
+import { saveConversation, getConversation, nextConversationUpdate } from '@/lib/conversations'
 import { v4 as uuidv4 } from 'uuid'
 import type { ChatMessage, Conversation } from '@/types'
 import { getCurrentUser, unauthorized } from '@/lib/auth'
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Load or create conversation
-    const existing = typeof conversationId === 'string' ? getConversation(conversationId, user) : null
+    const existing = typeof conversationId === 'string' ? await getConversation(conversationId, user) : null
     if (conversationId && !existing) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
@@ -149,10 +150,10 @@ export async function POST(request: NextRequest) {
       conversation.selectedTheme = selectedThemeId
     }
 
-    conversation.updatedAt = new Date().toISOString()
+    conversation.updatedAt = nextConversationUpdate(previousUpdate)
 
     // Save conversation
-    if (!saveConversation(conversation, user, previousUpdate)) {
+    if (!await saveConversation(conversation, user, previousUpdate)) {
       return NextResponse.json({ error: 'This conversation changed while generating. Reopen it and try again.' }, { status: 409 })
     }
 

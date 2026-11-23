@@ -132,7 +132,9 @@ To grant administrator access, create the account first and run the following co
 npm run promote-admin -- name@example.com
 ```
 
-Administrators can open `/admin` to review users and manage team documents. Pre-existing local conversations and documents appear as unassigned to administrators. Local accounts and sessions use SQLite. Vercel deployments without a persistent `STUDIO_DATA_DIR` use Atlas for accounts and sessions. Set `MONGODB_URI` and `MONGODB_DB` in the Vercel environment before deploying. Users who signed up on the old temporary backend need to sign up again. For an Atlas account, use `npm run promote-admin -- name@example.com --mongo` with the same MongoDB configuration as the deployment. Saved documents still require persistent SQLite storage.
+Administrators can open `/admin` to review users and manage team documents. Local accounts and sessions use SQLite. Vercel deployments without a persistent `STUDIO_DATA_DIR` use Atlas for accounts and sessions. Set `MONGODB_URI` and `MONGODB_DB` in the Vercel environment before deploying. Users who signed up on the old temporary backend need to sign up again. For an Atlas account, use `npm run promote-admin -- name@example.com --mongo` with the same MongoDB configuration as the deployment.
+
+With `MONGODB_URI` configured, new conversations and saved documents are stored in Atlas. Recent Conversations and the Documents library load summaries first, and the studio fetches the full document when you open it. If a document is still open and its old conversation no longer exists, **Save document** can recover it as a new saved copy. If its old SQLite database is still available, import a specific saved document with `npm run import:saved-document -- CONVERSATION_ID name@example.com`. Add `--hosted` when the destination account is stored in Atlas. Run this against the same MongoDB database as the destination app.
 
 ### Optional: Import an Itinerary Photo Library
 

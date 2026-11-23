@@ -9,7 +9,8 @@
         "start": "next start",
         "import:itinerary-images": "node scripts/import-itinerary-images.mjs",
         "setup:image-search": "node --env-file-if-exists=.env.local scripts/setup-image-search.mjs",
-        "promote-admin": "node --env-file-if-exists=.env.local scripts/promote-admin.mjs"
+        "promote-admin": "node --env-file-if-exists=.env.local scripts/promote-admin.mjs",
+        "import:saved-document": "node --env-file-if-exists=.env.local scripts/import-saved-document.mjs"
     },
     "dependencies": {
         "@google/genai": "^3.0.0",

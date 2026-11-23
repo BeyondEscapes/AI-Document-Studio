@@ -1,11 +1,11 @@
 import { DocumentLibrary } from '@/components/DocumentLibrary'
 import { WorkspaceHeader } from '@/components/WorkspaceHeader'
 import { requireUser } from '@/lib/auth'
-import { listSavedDocuments } from '@/lib/db'
+import { listSavedDocuments } from '@/lib/conversations'
 
 export default async function DocumentsPage() {
   const user = await requireUser()
-  const documents = listSavedDocuments(user)
+  const documents = await listSavedDocuments(user)
   return (
     <div className="workspace-frame">
       <WorkspaceHeader name={user.name} role={user.role} />

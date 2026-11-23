@@ -36,6 +36,7 @@ const ItineraryMapEditor = dynamic(() => import('@/components/ItineraryMapEditor
 
 interface DocumentWorkspaceProps {
   startInEdit?: boolean
+  cloudDocuments?: boolean
   documentContent: DocumentContent | null
   themes: DocumentTheme[]
   selectedThemeId: string
@@ -65,7 +66,7 @@ function hasCurrentItineraryMap(content: DocumentContent): boolean {
 
 export function DocumentWorkspace({
   documentContent, themes, selectedThemeId, onThemeChange, onDocumentUpdate,
-  onSaveDocument, saveStatus, saveError, onClose, startInEdit
+  onSaveDocument, saveStatus, saveError, onClose, startInEdit, cloudDocuments
 }: DocumentWorkspaceProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(startInEdit ? 'edit' : 'preview')
   const [manualSaveError, setManualSaveError] = useState<string | null>(null)
@@ -559,12 +560,12 @@ export function DocumentWorkspace({
     setDetailStatus(`Switched to ${config.label} detail level (${config.sublabel}). Front and closing pages are preserved.`)
   }, [documentContent, onDocumentUpdate])
 
-  const handleSaveLocally = async () => {
+  const handleSave = async () => {
     setManualSaveError(null)
     try {
       await onSaveDocument()
     } catch (err) {
-      setManualSaveError(err instanceof Error ? err.message : 'Could not save this document locally.')
+      setManualSaveError(err instanceof Error ? err.message : 'Could not save this document.')
     }
   }
 
@@ -944,12 +945,12 @@ export function DocumentWorkspace({
       <div className="shrink-0 max-h-[35vh] overflow-y-auto border-t border-gray-200 px-4 py-3 bg-white">
         <div className="flex items-center gap-2 mb-3">
           <button
-            onClick={handleSaveLocally}
+            onClick={handleSave}
             disabled={saveStatus === 'saving'}
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
           >
             {saveStatus === 'saving' ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            {saveStatus === 'saving' ? 'Saving...' : 'Save locally'}
+            {saveStatus === 'saving' ? 'Saving...' : 'Save document'}
           </button>
           <button
             onClick={handleApprovalToggle}
@@ -969,9 +970,9 @@ export function DocumentWorkspace({
             {saveStatus === 'error'
               ? saveError || manualSaveError || 'Local save failed. Retry to save.'
               : saveStatus === 'saving'
-                ? 'Saving changes locally...'
+                ? 'Saving changes...'
                 : saveStatus === 'saved'
-                  ? 'Saved locally'
+                  ? (cloudDocuments ? 'Saved to MongoDB' : 'Saved on this server')
                   : 'Changes save to this device'}
           </span>
           <span className={documentContent.approval?.status === 'approved' ? 'text-green-700' : 'text-amber-700'}>

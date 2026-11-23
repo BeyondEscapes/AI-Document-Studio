@@ -168,7 +168,7 @@ export function Sidebar({
                 : 'hover:bg-gray-50 text-gray-700'
             } ${deletingId === conv.id ? 'opacity-50 scale-95 transition-all' : ''}`}
           >
-            <button type="button" title={conv.title} aria-label={conv.title}
+            <button type="button" title={conv.documentContent?.title || conv.title} aria-label={conv.documentContent?.title || conv.title}
               aria-current={activeConversationId === conv.id ? 'true' : undefined}
               aria-busy={openingId === conv.id}
               onPointerEnter={() => onPrefetchConversation(conv.id)}
@@ -178,7 +178,7 @@ export function Sidebar({
               {openingId === conv.id ? <Loader2 size={14} className="shrink-0 animate-spin" /> :
                 <FileText size={14} className="shrink-0" />}
               {isOpen && <span className="min-w-0">
-                <span className="block truncate text-xs font-medium">{conv.title}</span>
+                <span className="block truncate text-xs font-medium">{conv.documentContent?.title || conv.title}</span>
                 <span className="block text-[10px] text-gray-400">
                   {openingId === conv.id ? 'Opening…' : formatDate(conv.updatedAt)}
                 </span>

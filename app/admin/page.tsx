@@ -3,16 +3,16 @@ import { BadgeCheck, FileText, Users } from 'lucide-react'
 import { DocumentLibrary } from '@/components/DocumentLibrary'
 import { WorkspaceHeader } from '@/components/WorkspaceHeader'
 import { listUsers, requireUser } from '@/lib/auth'
-import { listSavedDocuments } from '@/lib/db'
+import { listSavedDocuments } from '@/lib/conversations'
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'Asia/Colombo' })
 
 export default async function AdminPage() {
   const user = await requireUser()
   if (user.role !== 'admin') redirect('/documents')
-  const users = await listUsers()
+  const [users, savedDocuments] = await Promise.all([listUsers(), listSavedDocuments(user, true)])
   const owners = new Map(users.map(account => [account.id, account.name]))
-  const documents = listSavedDocuments(user, true).map(document => ({
+  const documents = savedDocuments.map(document => ({
     ...document,
     ownerName: document.ownerId ? owners.get(document.ownerId) ?? document.ownerName : null,
   }))
