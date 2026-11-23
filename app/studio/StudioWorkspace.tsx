@@ -5,11 +5,14 @@ import { Sidebar } from '@/components/Sidebar'
 import { ChatPanel } from '@/components/ChatPanel'
 import { DocumentWorkspace } from '@/components/DocumentWorkspace'
 import { prepareDocumentForLocalSave } from '@/lib/itinerary-images'
+import { rememberStudioConversation } from '@/lib/studio-navigation'
 import type { Conversation, DocumentContent, DocumentTheme, AppSettings } from '@/types'
 
-export default function StudioWorkspace({ initialConversation, cloudDocuments }: {
+export default function StudioWorkspace({ userId, initialConversation, cloudDocuments, openInEdit }: {
+  userId: string
   initialConversation: Conversation | null
   cloudDocuments: boolean
+  openInEdit: boolean
 }) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(initialConversation)
@@ -30,8 +33,14 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
   const pendingSave = useRef<Promise<unknown>>(Promise.resolve())
   const saveSequence = useRef(0)
 
+  const setActiveId = useCallback((id?: string) => {
+    activeId.current = id
+    rememberStudioConversation(userId, id)
+  }, [userId])
+
   // Load initial data
   useEffect(() => {
+    rememberStudioConversation(userId, activeId.current)
     if (window.matchMedia('(max-width: 767px)').matches) setIsSidebarOpen(false)
     loadConversations()
     loadThemes()
@@ -78,13 +87,13 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
     selectedRequest.current += 1
     setOpeningId(null)
     setOpenError(null)
-    activeId.current = undefined
+    setActiveId()
     setActiveConversation(null)
     setDocumentContent(null)
     setIsDocPanelOpen(false)
     setDocumentSaveStatus('idle')
     setDocumentSaveError(null)
-  }, [])
+  }, [setActiveId])
 
   const loadConversation = useCallback((id: string) => {
     const existing = conversationRequests.current.get(id)
@@ -122,7 +131,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
     try {
       const loaded = await loadConversation(conversation.id)
       if (selectedRequest.current !== requestNumber) return
-      activeId.current = loaded.id
+      setActiveId(loaded.id)
       setActiveConversation(loaded)
       setSelectedThemeId(loaded.selectedTheme || settings?.defaultThemeId || 'beyond-escapes-official')
       setDocumentContent(loaded.documentContent ?? null)
@@ -136,7 +145,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
     } finally {
       if (selectedRequest.current === requestNumber) setOpeningId(null)
     }
-  }, [documentContent, loadConversation, settings?.defaultThemeId])
+  }, [documentContent, loadConversation, setActiveId, settings?.defaultThemeId])
 
   const handleDeleteConversation = useCallback(async (id: string) => {
     try {
@@ -145,7 +154,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
       conversationRequests.current.delete(id)
       setConversations(prev => prev.filter(c => c.id !== id))
       if (activeConversation?.id === id) {
-        activeId.current = undefined
+        setActiveId()
         setActiveConversation(null)
         setDocumentContent(null)
         setIsDocPanelOpen(false)
@@ -154,7 +163,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
     } catch (err) {
       console.error('Failed to delete conversation:', err)
     }
-  }, [activeConversation])
+  }, [activeConversation, setActiveId])
 
   const handleMessageSent = useCallback((
     updatedConversation: Conversation,
@@ -162,7 +171,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
     clearDocument = false
   ) => {
     conversationRequests.current.delete(updatedConversation.id)
-    activeId.current = updatedConversation.id
+    setActiveId(updatedConversation.id)
     setActiveConversation(updatedConversation)
     setConversations(prev => {
       const idx = prev.findIndex(c => c.id === updatedConversation.id)
@@ -182,7 +191,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
       setIsDocPanelOpen(false)
       setDocumentSaveStatus('idle')
     }
-  }, [])
+  }, [setActiveId])
 
   const persistDocument = useCallback(async (content: DocumentContent, recoverMissing = false) => {
     if (!activeConversation) {
@@ -236,7 +245,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
       conversationRequests.current.delete(id)
 
       if (isCurrent()) {
-        activeId.current = conversation.id
+        setActiveId(conversation.id)
         setActiveConversation(conversation)
         setConversations(prev => [conversation, ...prev.filter(item => item.id !== conversation.id && item.id !== id)])
         setDocumentSaveStatus('saved')
@@ -252,7 +261,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
       }
       throw err
     }
-  }, [activeConversation, selectedThemeId])
+  }, [activeConversation, selectedThemeId, setActiveId])
 
   const handleDocumentUpdate = useCallback((content: DocumentContent) => {
     setDocumentContent(content)
@@ -324,7 +333,7 @@ export default function StudioWorkspace({ initialConversation, cloudDocuments }:
           <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
             <DocumentWorkspace
               key={activeConversation?.id}
-              startInEdit={activeConversation?.id === initialConversation?.id && Boolean(initialConversation)}
+              startInEdit={openInEdit && activeConversation?.id === initialConversation?.id}
               documentContent={documentContent}
               themes={themes}
               selectedThemeId={selectedThemeId}

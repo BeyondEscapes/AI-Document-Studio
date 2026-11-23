@@ -23,7 +23,7 @@ export default async function AdminPage() {
   ]
   return (
     <div className="workspace-frame">
-      <WorkspaceHeader name={user.name} role={user.role} />
+      <WorkspaceHeader userId={user.id} name={user.name} role={user.role} />
       <main className="workspace-scroll">
         <div className="dashboard-content">
           <div className="dashboard-heading">

@@ -2,13 +2,15 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Files, LayoutDashboard, LogOut, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { ThemeToggle } from './ThemeToggle'
+import { rememberStudioConversation, studioReturnHref } from '@/lib/studio-navigation'
 
-export function WorkspaceHeader({ name, role }: { name: string; role: 'member' | 'admin' }) {
+export function WorkspaceHeader({ userId, name, role }: { userId: string; name: string; role: 'member' | 'admin' }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState(false)
   const entries = [
@@ -27,6 +29,7 @@ export function WorkspaceHeader({ name, role }: { name: string; role: 'member' |
         body: JSON.stringify({ action: 'logout' }),
       })
       if (!response.ok) throw new Error()
+      rememberStudioConversation(userId)
       window.location.replace('/login')
     } catch {
       setError(true)
@@ -34,9 +37,14 @@ export function WorkspaceHeader({ name, role }: { name: string; role: 'member' |
     }
   }
 
+  function resumeStudio(event: { preventDefault: () => void }) {
+    event.preventDefault()
+    if (pathname !== '/studio') router.push(studioReturnHref(userId))
+  }
+
   return (
     <header className="workspace-header">
-      <Link href="/studio" className="workspace-brand" aria-label="Beyond Escapes Document Studio">
+      <Link href="/studio" onNavigate={resumeStudio} className="workspace-brand" aria-label="Beyond Escapes Document Studio">
         <span className="workspace-brand-mark">
           <Image src="/images/beyond_escapes_icon_white.png" alt="" width={26} height={26} />
         </span>
@@ -44,7 +52,8 @@ export function WorkspaceHeader({ name, role }: { name: string; role: 'member' |
       </Link>
       <nav className="workspace-nav" aria-label="Workspace">
         {entries.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className="workspace-nav-link" aria-current={pathname === href ? 'page' : undefined}>
+          <Link key={href} href={href} onNavigate={href === '/studio' ? resumeStudio : undefined}
+            className="workspace-nav-link" aria-current={pathname === href ? 'page' : undefined}>
             <Icon size={16} aria-hidden="true" /><span>{label}</span>
           </Link>
         ))}
