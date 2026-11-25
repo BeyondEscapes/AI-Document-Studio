@@ -6,6 +6,7 @@ import {
   ChevronRight, FileText, Upload, Key, Check, X, AlertCircle,
   ChevronDown, ChevronUp, Palette, Loader2
 } from 'lucide-react'
+import { DOCUMENT_LANGUAGES, parseDocumentLanguage } from '@/lib/document-languages'
 import type { Conversation, DocumentTheme, AppSettings } from '@/types'
 
 interface SidebarProps {
@@ -24,7 +25,7 @@ interface SidebarProps {
   onSelectConversation: (conv: Conversation) => void
   onDeleteConversation: (id: string) => void
   onToggle: () => void
-  onSettingsUpdate: (settings: Partial<AppSettings>) => void
+  onSettingsUpdate: (settings: Partial<AppSettings>) => Promise<void>
   onThemeUpload: () => void
   onThemeChange: (themeId: string) => void
 }
@@ -36,6 +37,20 @@ export function Sidebar({
   onToggle, onSettingsUpdate, onThemeUpload, onThemeChange,
 }: SidebarProps) {
   const [showSettings, setShowSettings] = useState(false)
+  const [savingLanguage, setSavingLanguage] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
+
+  async function saveLanguage(language: string) {
+    setSavingLanguage(true)
+    setSettingsError('')
+    try {
+      await onSettingsUpdate({ language })
+    } catch {
+      setSettingsError('Could not save the document language. Try again.')
+    } finally {
+      setSavingLanguage(false)
+    }
+  }
   const [showThemes, setShowThemes] = useState(false)
   const [uploadingTheme, setUploadingTheme] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -301,7 +316,11 @@ export function Sidebar({
                   <p className="text-[10px] font-medium text-ui-muted mb-1">AI Model</p>
                   <select
                     value={settings?.geminiModel || 'gemini-3.1-flash-lite'}
-                    onChange={e => onSettingsUpdate({ geminiModel: e.target.value })}
+                    onChange={event => {
+                      setSettingsError('')
+                      void onSettingsUpdate({ geminiModel: event.target.value })
+                        .catch(() => setSettingsError('Could not save the AI model. Try again.'))
+                    }}
                     className="w-full px-2 py-1 text-xs border border-ui-line rounded-lg focus:outline-none focus:ring-1 focus:ring-ui-accent"
                   >
                     <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Ultra Fast ~1.7s - Recommended)</option>
@@ -312,19 +331,20 @@ export function Sidebar({
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-medium text-ui-muted mb-1">Default Language</p>
+                  <label htmlFor="document-language" className="mb-1 block text-[10px] font-medium text-ui-muted">
+                    Default document language
+                  </label>
                   <select
-                    value={settings?.language || 'English'}
-                    onChange={e => onSettingsUpdate({ language: e.target.value })}
-                    className="w-full px-2 py-1 text-xs border border-ui-line rounded-lg focus:outline-none focus:ring-1 focus:ring-ui-accent"
+                    id="document-language"
+                    value={parseDocumentLanguage(settings?.language) ?? 'English'}
+                    disabled={!settings || savingLanguage}
+                    onChange={event => void saveLanguage(event.target.value)}
+                    className="studio-language-select w-full rounded-lg border border-ui-line px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ui-accent"
                   >
-                    <option value="English">English</option>
-                    <option value="Sinhala">Sinhala</option>
-                    <option value="Tamil">Tamil</option>
-                    <option value="German">German</option>
-                    <option value="French">French</option>
-                    <option value="Spanish">Spanish</option>
+                    {DOCUMENT_LANGUAGES.map(language => <option key={language} value={language}>{language}</option>)}
                   </select>
+                  {savingLanguage && <p role="status" className="mt-1 text-[10px] text-ui-muted">Saving language?</p>}
+                  {settingsError && <p role="alert" className="mt-1 text-[10px] text-ui-danger">{settingsError}</p>}
                 </div>
               </div>
             )}

@@ -606,3 +606,19 @@
   .workspace-header { flex-wrap: wrap; }
   .workspace-nav { order: 1; flex: 1 0 100%; justify-content: center; }
 }
+
+
+.studio-language-select {
+  background-color: var(--studio-bg);
+  color: var(--studio-text);
+}
+
+.studio-language-select option {
+  background-color: #fff;
+  color: #142a3b;
+}
+
+[data-theme="dark"] .studio-language-select option {
+  background-color: #192635;
+  color: #edf5fc;
+}

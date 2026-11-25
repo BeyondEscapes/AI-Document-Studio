@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { BUSINESS_DOCUMENT_TEMPLATES, normalizeDocumentIntake } from '@/lib/business-documents'
+import { DOCUMENT_REQUEST_PROMPTS, parseDocumentLanguage, type DocumentLanguage } from '@/lib/document-languages'
 import type { DocumentContent, DocumentSection, DocumentIntake } from '@/types'
 
 function getClient(): GoogleGenAI {
@@ -24,7 +25,7 @@ DOCUMENT RULES:
 - For tour itineraries, client name, travel dates, and traveler count are NEVER required and must NOT be requested in chat. Generate the day-by-day itinerary documentContent immediately based on the route or destinations provided. If travel dates or client names are not provided, simply use relative days (Day 1, Day 2, etc.) and leave clientName and travelDates blank without asking any questions. Write a focused, fast, and structured itinerary. Write a 50–70 word overview. Structure every travel day with a heading1 containing its day and route, followed by one bullet_list of 3 concise, chronological key points, then heading2 attraction/activity names with a crisp 40–60 word descriptive paragraph. Keep each day sharp, authentic, and fast to read without filler. Use times only when supplied; otherwise show the sequence without inventing exact times.
 - The export automatically adds one branded opening page with the itinerary title, Ayubowan welcome artwork, Sri Lanka route map, overview and company contact details, plus a separate final page with the cancellation policy, Beyond Escapes contact details, logos, and styling. Do not generate duplicate cover, map, welcome, cancellation-policy, or contact pages.
 - Use a clear route-led title. Under each daily heading, put the chronological bullet list first, then attraction/activity subheadings and descriptive paragraphs; include accommodation details only when supplied. Keep the document practical and specific rather than padding it to meet a word count.
-- Preserve the user's language. Use a professional tone and Beyond Escapes branding. For edits, retain the document type and structured details unless the user changes them.
+- Use the configured output language when provided. Otherwise preserve the user's language. Use a professional tone and Beyond Escapes branding. For edits, retain the document type and structured details unless the user changes them.
 
 Always return valid JSON without markdown fences:
 {"message":"...","isNewDocument":false,"documentIntake":{"documentType":"supported key","fields":{"fieldKey":"user-provided value"}},"documentContent":null}
@@ -52,7 +53,8 @@ export function normalizeModel(model?: string): string {
 export async function generateDocumentContent(
   userMessage: string,
   conversationHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
-  requestedModel: string = 'gemini-3.1-flash-lite'
+  requestedModel: string = 'gemini-3.1-flash-lite',
+  language: DocumentLanguage = 'English',
 ): Promise<{
   message: string
   documentContent: DocumentContent | null
@@ -75,7 +77,9 @@ export async function generateDocumentContent(
       const chat = client.chats.create({
         model: modelToTry,
         config: {
-          systemInstruction: SYSTEM_PROMPT,
+          systemInstruction: `${SYSTEM_PROMPT}
+
+OUTPUT LANGUAGE: The default is ${language}. Write assistant replies, clarification questions, and generated document prose, headings, and table labels in this language unless the user explicitly requests another supported language. Report the actual language in metadata.language using its English name. Use Sinhala script for Sinhala and Tamil script for Tamil. Keep JSON keys and template identifiers unchanged. Preserve names, booking references, prices, and other supplied facts. For tour itineraries, use the exact heading "Overview" for the cover overview section so the export can place it on the cover. Write the overview text in the output language.`,
           temperature: 0.2,
           maxOutputTokens: 8192,
         },
@@ -98,8 +102,8 @@ export async function generateDocumentContent(
         const documentIntake = normalizeDocumentIntake(parsed.documentIntake)
 
         return {
-          message: typeof parsed.message === 'string' ? parsed.message : 'Please describe the document you need.',
-          documentContent: normalizeDocumentContent(parsed.documentContent, userMessage, documentIntake),
+          message: typeof parsed.message === 'string' ? parsed.message : DOCUMENT_REQUEST_PROMPTS[language],
+          documentContent: normalizeDocumentContent(parsed.documentContent, userMessage, documentIntake, language),
           documentIntake,
           isNewDocument: parsed.isNewDocument === true,
         }
@@ -143,7 +147,8 @@ export async function generateDocumentContent(
 function normalizeDocumentContent(
   value: unknown,
   prompt: string,
-  intake: DocumentIntake | null
+  intake: DocumentIntake | null,
+  language: DocumentLanguage,
 ): DocumentContent | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Record<string, unknown>
@@ -191,7 +196,7 @@ function normalizeDocumentContent(
     metadata: {
       generatedAt: new Date().toISOString(),
       prompt,
-      ...(typeof sourceMetadata.language === 'string' ? { language: sourceMetadata.language } : {}),
+      language: parseDocumentLanguage(sourceMetadata.language) ?? language,
       ...(typeof sourceMetadata.tone === 'string' ? { tone: sourceMetadata.tone } : {}),
     },
   }

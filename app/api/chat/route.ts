@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateDocumentContent, checkApiKey, normalizeModel } from '@/lib/gemini'
 import { getDocumentFieldLabel, getMissingRequiredFields, mergeDocumentIntakes } from '@/lib/business-documents'
-import { getTheme } from '@/lib/db'
+import { documentLanguageCookie, parseDocumentLanguage } from '@/lib/document-languages'
+import { getSettings, getTheme } from '@/lib/db'
 import { saveConversation, getConversation, nextConversationUpdate } from '@/lib/conversations'
 import { v4 as uuidv4 } from 'uuid'
 import type { ChatMessage, Conversation } from '@/types'
@@ -86,7 +87,9 @@ export async function POST(request: NextRequest) {
     conversation.messages.push(userMessage)
 
     // Generate AI response with normalized model
-    const result = await generateDocumentContent(message, history, normalizeModel(model))
+    const language = parseDocumentLanguage(request.cookies.get(documentLanguageCookie(user.id))?.value)
+      ?? parseDocumentLanguage(getSettings(user).language) ?? 'English'
+    const result = await generateDocumentContent(message, history, normalizeModel(model), language)
     const documentIntake = result.documentIntake
       ? mergeDocumentIntakes(result.isNewDocument ? undefined : previousIntake, result.documentIntake)
       : undefined
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
     if (documentIntake && missingFields.length > 0 && !documentContent && !isItinerary) {
       const missingLabels = missingFields
         .map(key => getDocumentFieldLabel(documentIntake.documentType, key))
-      responseText = `I've identified this as a ${documentIntake.documentType.replaceAll('_', ' ')}. To prepare it accurately, could you provide these missing details: ${missingLabels.join(', ')}?`
+      if (language === 'English') responseText = `I've identified this as a ${documentIntake.documentType.replaceAll('_', ' ')}. To prepare it accurately, could you provide these missing details: ${missingLabels.join(', ')}?`
       documentContent = null
     } else if ((documentIntake || isItinerary) && documentContent) {
       documentContent = {

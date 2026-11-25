@@ -274,16 +274,13 @@ export default function StudioWorkspace({ userId, initialConversation, cloudDocu
   }, [cloudDocuments, documentContent, persistDocument])
 
   const handleSettingsUpdate = useCallback(async (newSettings: Partial<AppSettings>) => {
-    try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings),
-      })
-      setSettings(prev => prev ? { ...prev, ...newSettings } : null)
-    } catch (err) {
-      console.error('Failed to save settings:', err)
-    }
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSettings),
+    })
+    if (!response.ok) throw new Error('Failed to save settings')
+    setSettings(prev => prev ? { ...prev, ...newSettings } : prev)
   }, [])
 
   const handleThemeUpload = useCallback(async () => {
