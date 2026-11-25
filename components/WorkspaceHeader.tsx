@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Files, ImageIcon, LayoutDashboard, LogOut, Sparkles } from 'lucide-react'
 import { useState } from 'react'
-import { ThemeToggle } from './ThemeToggle'
+import { WallpaperToggle } from './WallpaperToggle'
 import { rememberStudioConversation, studioReturnHref } from '@/lib/studio-navigation'
 
 export function WorkspaceHeader({ userId, name, role }: { userId: string; name: string; role: 'member' | 'admin' }) {
@@ -61,7 +61,7 @@ export function WorkspaceHeader({ userId, name, role }: { userId: string; name: 
       </nav>
       <div className="workspace-account">
         <span className="workspace-account-name">{name}</span>
-        <ThemeToggle />
+        <WallpaperToggle />
         <button type="button" className="icon-button" onClick={signOut} disabled={signingOut}
           aria-label="Sign out" title="Sign out"><LogOut size={18} /></button>
         {error && <span className="header-error" role="alert">Could not sign out. Try again.</span>}
