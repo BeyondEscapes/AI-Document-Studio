@@ -276,6 +276,13 @@
 .button-compact { min-height: 34px; padding: 0 11px; font-size: .78rem; }
 .button-square { width: 38px; min-height: 38px; padding: 0; }
 .studio-paper { background: white; color: #142a3b; color-scheme: light; }
+.preview-photo-change {
+  --studio-text: #142a3b;
+  --studio-line: #748a9a;
+  --studio-subtle: #edf2f5;
+  --studio-accent: #05665e;
+  background: white;
+}
 .document-toolbar {
   display: flex;
   flex: 0 0 auto;

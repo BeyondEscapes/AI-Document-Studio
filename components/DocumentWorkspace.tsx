@@ -1326,7 +1326,7 @@ function SectionPreview({ section, onImageReplace }: { section: DocumentSection;
           )}
           {onImageReplace && (
             <div className="mt-1 flex justify-center print:hidden">
-              <button type="button" className="secondary-button button-compact"
+              <button type="button" className="secondary-button button-compact preview-photo-change"
                 aria-label={`Change photo: ${image.altText}`} onClick={() => onImageReplace(section.id, index)}>
                 <RefreshCw size={12} aria-hidden="true" /> Change photo
               </button>
