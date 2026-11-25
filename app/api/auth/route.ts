@@ -4,7 +4,7 @@ import {
   loginChallengeCookie, registerUser, startLoginChallenge, verifyAccountEmail,
 } from '@/lib/auth'
 import { useMongoAuth } from '@/lib/mongodb-auth'
-import { sendLoginCode, sendVerificationEmail, verificationMailConfig } from '@/lib/verification-email'
+import { sendLoginCode, sendVerificationEmail, VerificationDeliveryError, verificationMailConfig } from '@/lib/verification-email'
 
 const verificationResponse = () => NextResponse.json({ success: true, verificationRequired: true }, { status: 202 })
 
@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })
   }
 
+  let stage = 'authentication'
   try {
     if (useMongoAuth() && !process.env.MONGODB_URI) {
       return NextResponse.json({ error: 'Authentication is unavailable on this deployment.' }, { status: 503 })
@@ -71,7 +72,10 @@ export async function POST(request: NextRequest) {
         const account = await authenticate(email, password)
         if (account) token = await issueEmailVerification(account)
       }
-      if (token) await sendVerificationEmail(mail, email, token)
+      if (token) {
+        stage = 'signup verification delivery'
+        await sendVerificationEmail(mail, email, token)
+      }
       // The same response avoids disclosing whether a submitted address is registered.
       return verificationResponse()
     }
@@ -99,7 +103,9 @@ export async function POST(request: NextRequest) {
     if (!await allowAuthAttempt(`login-mail:${email}`, 5)) {
       return NextResponse.json({ error: 'Too many sign-in emails requested. Try again later.' }, { status: 429 })
     }
+    stage = 'sign-in code creation'
     const challenge = await startLoginChallenge(account, nonce)
+    stage = 'sign-in code delivery'
     await sendLoginCode(mail, email, challenge.code)
     const response = NextResponse.json({ success: true, loginCodeRequired: true }, { status: 202 })
     response.cookies.set(loginChallengeCookie, challenge.nonce, {
@@ -107,7 +113,17 @@ export async function POST(request: NextRequest) {
     })
     return response
   } catch (error) {
-    console.error('Authentication request failed:', error instanceof Error ? error.message : 'Unknown error')
-    return NextResponse.json({ error: 'Could not complete the request. If your verification email did not arrive, request a new link.' }, { status: 500 })
+    if (error instanceof VerificationDeliveryError) {
+      console.error('Authentication mail failed:', { stage, reason: error.reason, providerStatus: error.status })
+      const message = {
+        sender: 'The email provider rejected the message. Ask your administrator to check the verified sender domain in Resend.',
+        key: 'The email provider rejected the API key. Ask your administrator to check the Resend sending key.',
+        limit: 'The email provider has reached its sending limit. Try again later or contact your workspace administrator.',
+        unavailable: 'The email provider is temporarily unavailable. Try again in a few minutes.',
+      }[error.reason]
+      return NextResponse.json({ error: message }, { status: 503 })
+    }
+    console.error('Authentication request failed:', { stage, error: error instanceof Error ? error.name : 'Unknown error' })
+    return NextResponse.json({ error: 'Could not complete authentication. Try again or contact your workspace administrator.' }, { status: 500 })
   }
 }

@@ -35,13 +35,38 @@ export async function sendLoginCode(
     `Your sign-in code is ${code}. It expires in 5 minutes. If you did not try to sign in, ignore this email.`)
 }
 
+export class VerificationDeliveryError extends Error {
+  readonly reason: 'sender' | 'key' | 'limit' | 'unavailable'
+  readonly status?: number
+
+  constructor(reason: VerificationDeliveryError['reason'], status?: number) {
+    super('Verification email delivery failed')
+    this.reason = reason
+    this.status = status
+  }
+}
+
 async function sendMail(config: { apiKey: string; from: string }, email: string, subject: string, text: string) {
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: config.from, to: [email], subject, text }),
-    signal: AbortSignal.timeout(10_000),
-    redirect: 'error',
-  })
-  if (!response.ok) throw new Error(`Verification email provider returned ${response.status}`)
+  let response: Response
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: config.from, to: [email], subject, text }),
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
+    })
+  } catch {
+    throw new VerificationDeliveryError('unavailable')
+  }
+  if (response.ok) return
+
+  const body: unknown = await response.json().catch(() => null)
+  const name = body && typeof body === 'object' && 'name' in body ? body.name : undefined
+  if (response.status === 429) throw new VerificationDeliveryError('limit', response.status)
+  if (response.status === 401 || name === 'invalid_api_key' || name === 'restricted_api_key' || name === 'missing_api_key') {
+    throw new VerificationDeliveryError('key', response.status)
+  }
+  if (response.status === 403 || response.status === 422) throw new VerificationDeliveryError('sender', response.status)
+  throw new VerificationDeliveryError('unavailable', response.status)
 }
