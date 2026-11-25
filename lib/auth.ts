@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomInt, randomUUID, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -257,5 +257,76 @@ export async function manageMemberAccount(id: string, action: AccountAction) {
     if (!result.changes) return false
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id)
     return true
+  }).immediate()
+}
+
+export const loginChallengeCookie = 'studio_login_challenge'
+const loginChallengeLifetime = 300
+const maxCodeAttempts = 5
+const validNonce = /^[a-f0-9]{64}$/
+
+export async function startLoginChallenge(account: AuthRow, previousNonce?: string) {
+  const nonce = randomBytes(32).toString('hex')
+  const code = randomInt(100_000, 1_000_000).toString()
+  const id = hashToken(nonce)
+  const codeHash = hashToken(`${nonce}:${code}`)
+  const sessionVersion = account.sessionVersion ?? 0
+  const now = Date.now()
+  const expiresAt = now + loginChallengeLifetime * 1000
+  const previousId = previousNonce && validNonce.test(previousNonce) ? hashToken(previousNonce) : undefined
+  if (useMongoAuth()) {
+    const { loginChallenges } = await mongoAuthCollections()
+    if (previousId) await loginChallenges.deleteOne({ _id: previousId })
+    await loginChallenges.insertOne({ _id: id, accountId: account.id, codeHash, sessionVersion, expiresAt: new Date(expiresAt), attempts: 0 })
+  } else {
+    const db = getDb()
+    db.transaction(() => {
+      db.prepare('DELETE FROM login_challenges WHERE expires_at <= ?').run(now)
+      if (previousId) db.prepare('DELETE FROM login_challenges WHERE id = ?').run(previousId)
+      db.prepare(`
+        INSERT INTO login_challenges (id, account_id, code_hash, session_version, expires_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(id, account.id, codeHash, sessionVersion, expiresAt)
+    })()
+  }
+  return { nonce, code, maxAge: loginChallengeLifetime }
+}
+
+export async function consumeLoginChallenge(nonce: string, code: string) {
+  if (!validNonce.test(nonce)) return null
+  const id = hashToken(nonce)
+  const codeHash = hashToken(`${nonce}:${code}`)
+  const now = Date.now()
+  if (useMongoAuth()) {
+    const { accounts, loginChallenges } = await mongoAuthCollections()
+    const active = { _id: id, expiresAt: { $gt: new Date(now) }, attempts: { $lt: maxCodeAttempts } }
+    const challenge = await loginChallenges.findOneAndDelete({ ...active, codeHash })
+    if (!challenge) {
+      await loginChallenges.updateOne(active, { $inc: { attempts: 1 } })
+      return null
+    }
+    const account = await accounts.findOne({
+      id: challenge.accountId, suspendedAt: null,
+      $or: [{ verificationRequired: { $ne: true } }, { emailVerifiedAt: { $type: 'string' }, accessApprovedAt: { $type: 'string' } }],
+    }, { projection: { sessionVersion: 1 } })
+    return account && (account.sessionVersion ?? 0) === challenge.sessionVersion
+      ? { accountId: challenge.accountId, sessionVersion: challenge.sessionVersion } : null
+  }
+  const db = getDb()
+  return db.transaction(() => {
+    const challenge = db.prepare(`
+      DELETE FROM login_challenges WHERE id = ? AND code_hash = ? AND expires_at > ? AND attempts < ?
+      RETURNING account_id AS accountId, session_version AS sessionVersion
+    `).get(id, codeHash, now, maxCodeAttempts) as { accountId: string; sessionVersion: number } | undefined
+    if (!challenge) {
+      db.prepare('UPDATE login_challenges SET attempts = attempts + 1 WHERE id = ? AND expires_at > ? AND attempts < ?')
+        .run(id, now, maxCodeAttempts)
+      return null
+    }
+    const account = db.prepare(`
+      SELECT id FROM users WHERE id = ? AND session_version = ? AND suspended_at IS NULL
+        AND (verification_required = 0 OR (email_verified_at IS NOT NULL AND access_approved_at IS NOT NULL))
+    `).get(challenge.accountId, challenge.sessionVersion)
+    return account ? challenge : null
   }).immediate()
 }

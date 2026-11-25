@@ -22,15 +22,24 @@ export async function sendVerificationEmail(
 ) {
   const link = new URL('/verify-email', config.origin)
   link.hash = new URLSearchParams({ email, token }).toString()
+  await sendMail(config, email, 'Verify your Document Studio email',
+    `Open this link and enter the password you chose when you signed up:\n\n${link.href}\n\nThe link expires in 30 minutes. If you did not create this account, you can ignore this message.`)
+}
+
+export async function sendLoginCode(
+  config: NonNullable<ReturnType<typeof verificationMailConfig>>,
+  email: string,
+  code: string,
+) {
+  await sendMail(config, email, 'Your Document Studio sign-in code',
+    `Your sign-in code is ${code}. It expires in 5 minutes. If you did not try to sign in, ignore this email.`)
+}
+
+async function sendMail(config: { apiKey: string; from: string }, email: string, subject: string, text: string) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: config.from,
-      to: [email],
-      subject: 'Verify your Document Studio email',
-      text: `Open this link and enter the password you chose when you signed up:\n\n${link.href}\n\nThe link expires in 30 minutes. If you did not create this account, you can ignore this message.`,
-    }),
+    body: JSON.stringify({ from: config.from, to: [email], subject, text }),
     signal: AbortSignal.timeout(10_000),
     redirect: 'error',
   })

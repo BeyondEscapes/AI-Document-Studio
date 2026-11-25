@@ -49,6 +49,7 @@ cases.set(incomplete, { type: 'invoice', fields: { billTo: 'Example Company' } }
 cases.set(reviseIncomplete, { type: 'invoice', fields: { totalAmount: 'USD 50' } })
 const observedLanguages = new Set()
 const mail = new Map()
+const loginCodes = new Map()
 
 const gemini = createServer(async (request, response) => {
   try {
@@ -57,9 +58,15 @@ const gemini = createServer(async (request, response) => {
     const body = JSON.parse(input)
     if (request.url === '/emails') {
       const [recipient] = body.to
-      const url = body.text.match(/http[^\s]+/)?.[0]
-      if (!url) throw new Error('Missing verification link')
-      mail.set(recipient, new URLSearchParams(new URL(url).hash.slice(1)).get('token'))
+      if (body.subject.includes('sign-in code')) {
+        const code = body.text.match(/\b\d{6}\b/)?.[0]
+        if (!code) throw new Error('Missing sign-in code')
+        loginCodes.set(recipient, code)
+      } else {
+        const url = body.text.match(/http[^\s]+/)?.[0]
+        if (!url) throw new Error('Missing verification link')
+        mail.set(recipient, new URLSearchParams(new URL(url).hash.slice(1)).get('token'))
+      }
       response.setHeader('Content-Type', 'application/json')
       response.end(JSON.stringify({ id: 'mock-email' }))
       return
@@ -124,10 +131,21 @@ const auth = (action, email, fields = {}) => request('/api/auth', {
   method: 'POST', ...json({ action, email, name: 'Smoke Fixture', password, ...fields }),
   headers: { 'Content-Type': 'application/json', origin: base },
 })
+const confirmLogin = (code, cookie = '') => request('/api/auth', {
+  method: 'POST', ...json({ action: 'confirm-login', code }),
+}, cookie)
 const login = async email => {
   const response = await auth('login', email)
-  assert.equal(response.status, 200, await response.clone().text())
-  return response.headers.get('set-cookie').split(';')[0]
+  assert.equal(response.status, 202, await response.clone().text())
+  const challengeCookie = response.headers.get('set-cookie').split(';')[0]
+  assert.match(challengeCookie, /^studio_login_challenge=/)
+  await read(await request('/api/settings', {}, challengeCookie), 401)
+  assert.equal((await confirmLogin(loginCodes.get(email))).status, 400)
+  assert.equal((await confirmLogin('000000', challengeCookie)).status, 400)
+  const confirmed = await confirmLogin(loginCodes.get(email), challengeCookie)
+  assert.equal(confirmed.status, 200, await confirmed.clone().text())
+  assert.equal((await confirmLogin(loginCodes.get(email), challengeCookie)).status, 400)
+  return confirmed.headers.getSetCookie().find(cookie => cookie.startsWith('studio_session=')).split(';')[0]
 }
 const register = async email => {
   const signup = await auth('signup', email)
@@ -151,6 +169,23 @@ try {
     if (server.exitCode !== null || retry === 49) throw new Error('Smoke server did not start')
     await new Promise(resolve => setTimeout(resolve, 300))
   }
+  const loginPage = await request('/login')
+  assert.equal(loginPage.status, 200)
+  assert.doesNotMatch(await loginPage.text(), /Resend verification email/)
+  const limited = await auth('login', legacyEmail)
+  assert.equal(limited.status, 202)
+  const limitedCookie = limited.headers.get('set-cookie').split(';')[0]
+  for (let attempt = 0; attempt < 5; attempt++) {
+    assert.equal((await confirmLogin('000000', limitedCookie)).status, 400)
+  }
+  assert.equal((await confirmLogin(loginCodes.get(legacyEmail), limitedCookie)).status, 400)
+  const expired = await auth('login', legacyEmail)
+  assert.equal(expired.status, 202)
+  const expiringCookie = expired.headers.get('set-cookie').split(';')[0]
+  const challengeDb = new Database(path.join(data, 'studio.db'))
+  challengeDb.prepare('UPDATE login_challenges SET expires_at = 1').run()
+  challengeDb.close()
+  assert.equal((await confirmLogin(loginCodes.get(legacyEmail), expiringCookie)).status, 400)
   const legacySession = await login(legacyEmail)
   await read(await request('/api/settings', {}, legacySession))
   const adminEmail = 'first@example.test'

@@ -80,6 +80,15 @@ function initSchema(db: Database.Database) {
       expires_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
+    CREATE TABLE IF NOT EXISTS login_challenges (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL,
+      session_version INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS login_challenge_expiry ON login_challenges(expires_at);
     CREATE TABLE IF NOT EXISTS auth_attempts (
       key TEXT PRIMARY KEY,
       window INTEGER NOT NULL,
