@@ -18,7 +18,8 @@ import {
   suggestItineraryPageImages,
   suggestItineraryImageMatches,
 } from '@/lib/itinerary-images'
-import { folderKey, imageSearchText, uniqueImageFolders } from '@/lib/image-folders'
+import { folderKey, imageSearchText, itineraryPhotoFolder, uniqueImageFolders } from '@/lib/image-folders'
+import { ItineraryPhotoReplacement } from './ItineraryPhotoReplacement'
 import { getInitialRouteStops } from '@/lib/itinerary-route'
 import { extractItinerarySections, getItineraryPageContent } from '@/lib/itinerary-page-content'
 import { applyDetailLevel, DETAIL_LEVEL_CONFIGS } from '@/lib/itinerary-detail-levels'
@@ -75,6 +76,7 @@ export function DocumentWorkspace({
   const [manualSaveError, setManualSaveError] = useState<string | null>(null)
   const [imageCatalog, setImageCatalog] = useState<ItineraryImageCatalogItem[]>([])
   const [imagePickerSectionId, setImagePickerSectionId] = useState<string | null>(null)
+  const [replacement, setReplacement] = useState<{ sectionId: string; index: number; photo: DocumentImage }>()
   const [imageSearch, setImageSearch] = useState('')
   const [imageStatus, setImageStatus] = useState<string | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
@@ -414,6 +416,35 @@ export function DocumentWorkspace({
     setImageSearch('')
   }
 
+  function openPhotoReplacement(sectionId: string, index: number) {
+    const photo = documentContent?.sections.find(section => section.id === sectionId)?.images?.[index]
+    if (photo) setReplacement({ sectionId, index, photo })
+  }
+
+  function confirmPhotoReplacement(item: ItineraryImageCatalogItem) {
+    if (!documentContent || !replacement) return
+    const section = documentContent.sections.find(section => section.id === replacement.sectionId)
+    if (!section?.images || section.images[replacement.index] !== replacement.photo) {
+      setReplacement(undefined)
+      return
+    }
+    const images = [...section.images]
+    images[replacement.index] = {
+      ...replacement.photo,
+      catalogId: item.id,
+      src: item.url,
+      altText: item.title,
+      caption: item.title,
+      width: item.width,
+      height: item.height,
+    }
+    onDocumentUpdate(resetApproval({
+      ...documentContent,
+      sections: documentContent.sections.map(current => current.id === section.id ? { ...section, images } : current),
+    }))
+    setReplacement(undefined)
+  }
+
   const handleUploadImage = async (sectionId: string, file: File) => {
     setUploadingImageSectionId(sectionId)
     setImageError(null)
@@ -729,7 +760,7 @@ export function DocumentWorkspace({
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === 'preview' ? (
-          <div className="studio-paper"><DocumentPreview documentContent={documentContent} /></div>
+          <div className="studio-paper"><DocumentPreview documentContent={documentContent} onImageReplace={openPhotoReplacement} /></div>
         ) : (
           <DocumentEditor
             documentContent={documentContent}
@@ -743,6 +774,7 @@ export function DocumentWorkspace({
             onRouteStopsChange={handleRouteStopsChange}
             onMapImageChange={handleMapImageChange}
             onImagePick={setImagePickerSectionId}
+            onImageReplace={openPhotoReplacement}
             onImageUpload={handleUploadImage}
             onImageRemove={handleRemoveImage}
             uploadingImageSectionId={uploadingImageSectionId}
@@ -806,6 +838,16 @@ export function DocumentWorkspace({
         </div>,
         document.body,
       )}
+      {replacement && (
+        <ItineraryPhotoReplacement
+          photo={replacement.photo}
+          folder={itineraryPhotoFolder(documentContent.sections, replacement.sectionId, replacement.photo, imageCatalog)}
+          images={imageCatalog}
+          loading={isLoadingImageCatalog}
+          onConfirm={confirmPhotoReplacement}
+          onClose={() => setReplacement(undefined)}
+        />
+      )}
       {imagePickerSectionId && (
         <ItineraryImagePicker
           images={imageCatalog}
@@ -820,9 +862,14 @@ export function DocumentWorkspace({
 }
 
 // Document Preview Component
-function DocumentPreview({ documentContent }: { documentContent: DocumentContent }) {
+type ReplacePhoto = (sectionId: string, index: number) => void
+
+function DocumentPreview({ documentContent, onImageReplace }: {
+  documentContent: DocumentContent
+  onImageReplace?: ReplacePhoto
+}) {
   if (isItineraryDocument(documentContent)) {
-    return <ItineraryDocumentPreview documentContent={documentContent} />
+    return <ItineraryDocumentPreview documentContent={documentContent} onImageReplace={onImageReplace} />
   }
 
   const documentType = documentContent.documentType
@@ -870,7 +917,10 @@ function DocumentPreview({ documentContent }: { documentContent: DocumentContent
   )
 }
 
-function ItineraryDocumentPreview({ documentContent }: { documentContent: DocumentContent }) {
+function ItineraryDocumentPreview({ documentContent, onImageReplace }: {
+  documentContent: DocumentContent
+  onImageReplace?: ReplacePhoto
+}) {
   const pageContent = getItineraryPageContent(documentContent)
   const sections = extractItinerarySections(documentContent.sections).remaining
   const fields = documentContent.intake?.fields ?? {}
@@ -948,7 +998,7 @@ function ItineraryDocumentPreview({ documentContent }: { documentContent: Docume
       <article className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <p className="mb-3 font-sans text-[9px] font-semibold uppercase tracking-wide text-blue-700">Itinerary details</p>
         <div className="space-y-1 doc-preview">
-          {itinerarySections.map(section => <SectionPreview key={section.id} section={section} />)}
+          {itinerarySections.map(section => <SectionPreview key={section.id} section={section} onImageReplace={onImageReplace} />)}
         </div>
         <p className="my-8 text-center font-serif text-sm font-bold tracking-wider text-gray-900">
           ****END OF SERVICES****
@@ -1257,7 +1307,7 @@ function DocumentIntakePreview({ intake }: { intake: NonNullable<DocumentContent
   )
 }
 
-function SectionPreview({ section }: { section: DocumentSection }) {
+function SectionPreview({ section, onImageReplace }: { section: DocumentSection; onImageReplace?: ReplacePhoto }) {
   return (
     <>
       <SectionBody section={section} />
@@ -1273,6 +1323,14 @@ function SectionPreview({ section }: { section: DocumentSection }) {
           />
           {image.caption && (
             <figcaption className="mt-1 text-center text-xs text-gray-500">{image.caption}</figcaption>
+          )}
+          {onImageReplace && (
+            <div className="mt-1 flex justify-center print:hidden">
+              <button type="button" className="secondary-button button-compact"
+                aria-label={`Change photo: ${image.altText}`} onClick={() => onImageReplace(section.id, index)}>
+                <RefreshCw size={12} aria-hidden="true" /> Change photo
+              </button>
+            </div>
           )}
         </figure>
       ))}
@@ -1382,6 +1440,7 @@ function DocumentEditor({
   onRouteStopsChange,
   onMapImageChange,
   onImagePick,
+  onImageReplace,
   onImageUpload,
   onImageRemove,
   uploadingImageSectionId,
@@ -1397,6 +1456,7 @@ function DocumentEditor({
   onRouteStopsChange: (stops: ItineraryRouteStop[]) => void
   onMapImageChange: (image: DocumentImage, attribution: string, routeSignature: string) => void
   onImagePick: (sectionId: string) => void
+  onImageReplace: ReplacePhoto
   onImageUpload: (sectionId: string, file: File) => void
   onImageRemove: (sectionId: string, index: number) => void
   uploadingImageSectionId: string | null
@@ -1447,6 +1507,7 @@ function DocumentEditor({
           onAddAfter={(type) => onAddSection(section.id, type)}
           showImageTools={isItinerary}
           onImagePick={() => onImagePick(section.id)}
+          onImageReplace={index => onImageReplace(section.id, index)}
           onImageUpload={file => onImageUpload(section.id, file)}
           onImageRemove={index => onImageRemove(section.id, index)}
           isUploadingImage={uploadingImageSectionId === section.id}
@@ -1747,6 +1808,7 @@ function SectionEditor({
   onAddAfter,
   showImageTools,
   onImagePick,
+  onImageReplace,
   onImageUpload,
   onImageRemove,
   isUploadingImage,
@@ -1757,6 +1819,7 @@ function SectionEditor({
   onAddAfter: (type: DocumentSection['type']) => void
   showImageTools: boolean
   onImagePick: () => void
+  onImageReplace: (index: number) => void
   onImageUpload: (file: File) => void
   onImageRemove: (index: number) => void
   isUploadingImage: boolean
@@ -1839,6 +1902,10 @@ function SectionEditor({
                   className="h-12 w-[72px] rounded object-cover"
                 />
                 <span className="flex-1 truncate text-[10px] text-ui-muted">{image.caption || image.altText}</span>
+                <button type="button" className="secondary-button button-compact"
+                  aria-label={`Change photo: ${image.altText}`} onClick={() => onImageReplace(index)}>
+                  <RefreshCw size={12} aria-hidden="true" /> Change photo
+                </button>
                 <button
                   type="button"
                   onClick={() => onImageRemove(index)}
