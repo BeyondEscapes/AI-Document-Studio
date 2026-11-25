@@ -17,9 +17,11 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const wallpaper = (await cookies()).get('studio_wallpaper')?.value === 'on' ? 'on' : 'off'
+  const preferences = await cookies()
+  const theme = preferences.get('studio_theme')?.value === 'dark' ? 'dark' : 'light'
+  const wallpaper = preferences.get('studio_wallpaper')?.value === 'on' ? 'on' : 'off'
   return (
-    <html lang="en" data-wallpaper={wallpaper}>
+    <html lang="en" data-theme={theme} data-wallpaper={wallpaper}>
       <body className={inter.className}>{children}</body>
     </html>
   )

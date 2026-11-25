@@ -17,6 +17,29 @@
   --studio-warning-tint: #fff4d9;
 }
 
+[data-theme="dark"] {
+  color-scheme: dark;
+  --studio-bg: #101923;
+  --studio-panel: #192635;
+  --studio-subtle: #223346;
+  --studio-line: #35495e;
+  --studio-text: #edf5fc;
+  --studio-muted: #b2c3d2;
+  --studio-accent: #8cddd0;
+  --studio-accent-tint: #1b433f;
+  --studio-action: #09645a;
+  --studio-action-hover: #0b7166;
+  --studio-danger: #ffa9ae;
+  --studio-danger-tint: #4a2833;
+  --studio-warning: #ffdf91;
+  --studio-warning-tint: #45391f;
+  --surface-bg: var(--studio-bg);
+  --surface-card: var(--studio-panel);
+  --text-primary: var(--studio-text);
+  --text-secondary: var(--studio-muted);
+  --border-subtle: var(--studio-line);
+}
+
 :is(.workspace-frame, .auth-screen) :focus-visible {
   outline: 2px solid var(--studio-accent);
   outline-offset: 3px;
@@ -50,6 +73,12 @@
   pointer-events: none;
 }
 
+[data-theme="dark"] .wallpaper-surface {
+  --chat-wallpaper-ink: #a4cfc8;
+  --chat-wallpaper-opacity: .105;
+  background: radial-gradient(ellipse at 18% 8%, #203837, transparent 74%), var(--studio-bg);
+}
+
 [data-wallpaper="on"] .workspace-frame {
   --studio-bg: rgb(243 246 248 / .38);
   --studio-panel: rgb(255 255 255 / .86);
@@ -61,6 +90,28 @@
 
 [data-wallpaper="on"] .workspace-frame .wallpaper-surface {
   background: radial-gradient(ellipse at 18% 8%, rgb(225 242 238 / .36), transparent 74%);
+}
+
+[data-theme="dark"][data-wallpaper="on"] .workspace-frame {
+  --studio-bg: rgb(16 25 35 / .38);
+  --studio-panel: rgb(25 38 53 / .88);
+  --studio-subtle: rgb(34 51 70 / .88);
+  --studio-line: rgb(71 93 115 / .9);
+  background-color: #101923;
+  background-image: linear-gradient(rgb(13 26 36 / .72), rgb(13 26 36 / .76)),
+    url('/images/auth-coast-hd.webp');
+}
+
+[data-theme="dark"][data-wallpaper="on"] .workspace-frame .wallpaper-surface {
+  background: radial-gradient(ellipse at 18% 8%, rgb(32 56 55 / .28), transparent 74%);
+}
+
+[data-wallpaper="on"] .workspace-frame :is(.studio-shell, .chat-panel) {
+  background-color: transparent;
+}
+
+[data-wallpaper="on"] .workspace-frame :is(.chat-panel-header, .chat-composer) {
+  background-color: var(--studio-panel);
 }
 
 .wallpaper-toggle[aria-pressed="true"] {
@@ -417,6 +468,7 @@
 .auth-photo-tabs button::before { content: ''; width: 18px; height: 4px; border-radius: 4px; background: #ffffff78; }
 .auth-photo-tabs button[aria-pressed="true"]::before { background: white; }
 .auth-photo-tabs button:focus-visible { outline-color: white; }
+.auth-theme { position: absolute; top: 26px; right: clamp(20px, 3.5vw, 48px); }
 .auth-main { position: relative; display: grid; align-items: center; justify-items: center; padding: 74px 28px 52px; }
 .auth-form-wrap { width: min(100%, 390px); }
 .auth-form-wrap h1, .dashboard-heading h1 {
@@ -532,6 +584,7 @@
   .auth-visual-description { margin-top: 8px; }
   .auth-visual-footer { margin-top: 16px; padding-top: 6px; }
   .auth-main { padding: 62px 24px 42px; }
+  .auth-theme { top: 15px; right: 19px; }
   .workspace-header { gap: 7px; padding: 9px 10px; min-height: 56px; }
   .workspace-brand-label, .workspace-account-name { display: none; }
   .workspace-brand-mark { width: 34px; height: 34px; }

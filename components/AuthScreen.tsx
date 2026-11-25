@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useState, type FormEvent } from 'react'
 import { ArrowRight, Eye, EyeOff, MapPin } from 'lucide-react'
+import { ThemeToggle } from './ThemeToggle'
 
 const destinations = [
   { name: 'Sri Lanka’s south coast', asset: '/images/auth-coast-hd.webp' },
@@ -62,6 +63,7 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
         </div>
       </aside>
       <section className="auth-main" aria-labelledby="auth-title">
+        <div className="auth-theme"><ThemeToggle /></div>
         <div className="auth-form-wrap">
           <h1 id="auth-title">{signup ? 'Create your account' : 'Welcome back'}</h1>
           <p className="auth-intro">{signup ? 'Sign up to start using Document Studio.' : 'Sign in to open your workspace.'}</p>

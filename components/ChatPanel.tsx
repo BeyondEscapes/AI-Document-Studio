@@ -159,9 +159,9 @@ export function ChatPanel({
   const isEmptyConversation = messages.length === 0
 
   return (
-    <div className="flex flex-col h-full bg-ui-panel">
+    <div className="chat-panel flex h-full flex-col bg-ui-panel">
       {/* Header */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-ui-line px-4 py-3">
+      <div className="chat-panel-header flex h-14 shrink-0 items-center justify-between border-b border-ui-line px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <Sparkles size={16} className="shrink-0 text-ui-accent" />
           <h1 className="truncate text-sm font-semibold text-ui-body">
@@ -259,7 +259,7 @@ export function ChatPanel({
       )}
 
       {/* Input Area */}
-      <div className="shrink-0 border-t border-ui-line px-3 pb-2 pt-2 sm:px-4">
+      <div className="chat-composer shrink-0 border-t border-ui-line px-3 pb-2 pt-2 sm:px-4">
         <div className="mx-auto flex max-w-4xl items-end gap-2 rounded-xl border border-ui-line bg-ui-canvas px-2.5 py-1.5 focus-within:border-ui-accent focus-within:ring-2 focus-within:ring-ui-line">
           <textarea
             ref={textareaRef}
