@@ -91,7 +91,7 @@ python -m pip install python-docx lxml docx2pdf
 
 Set `RESEND_API_KEY`, `VERIFICATION_EMAIL_FROM` (an address on your verified Resend domain), and `STUDIO_PUBLIC_URL` (the public HTTPS origin) in the local or production environment. Signup requires a verification email. The user opens the link within 30 minutes and confirms the password they chose. An administrator then approves the verified account under **Admin > Accounts**.
 
-Sign-in requires the account email, password, and a six-digit email code that expires after five minutes. Configure email delivery before deploying this sign-in flow. Existing accounts keep their workspace approval. Administrators can suspend or reactivate members and revoke their sessions. To bootstrap a new workspace, first verify your own signup and run `npm run promote-admin -- account@example.com` (add `--mongo` for the hosted database). Treat the verification credentials as server-side secrets.
+Sign in with your account email and password. Email delivery is required for signup verification and resending signup links. Existing accounts retain access. Administrators can suspend or reactivate members and revoke their sessions. To bootstrap a new workspace, first verify your own signup and run `npm run promote-admin -- account@example.com` (add `--mongo` for the hosted database). Treat the verification credentials as server-side secrets.
 
 ### Vercel Deployment
 

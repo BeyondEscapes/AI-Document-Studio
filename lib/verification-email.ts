@@ -26,15 +26,6 @@ export async function sendVerificationEmail(
     `Open this link and enter the password you chose when you signed up:\n\n${link.href}\n\nThe link expires in 30 minutes. If you did not create this account, you can ignore this message.`)
 }
 
-export async function sendLoginCode(
-  config: NonNullable<ReturnType<typeof verificationMailConfig>>,
-  email: string,
-  code: string,
-) {
-  await sendMail(config, email, 'Your Document Studio sign-in code',
-    `Your sign-in code is ${code}. It expires in 5 minutes. If you did not try to sign in, ignore this email.`)
-}
-
 export class VerificationDeliveryError extends Error {
   readonly reason: 'sender' | 'key' | 'limit' | 'unavailable'
   readonly status?: number

@@ -25,19 +25,15 @@ async function connect() {
   const db = client.db(process.env.MONGODB_DB || 'doc_theme')
   const accounts = db.collection<Account>('studio_accounts')
   const sessions = db.collection<{ _id: string; accountId: string; expiresAt: Date; sessionVersion?: number }>('studio_sessions')
-  const loginChallenges = db.collection<{
-    _id: string; accountId: string; codeHash: string; sessionVersion: number; expiresAt: Date; attempts: number
-  }>('studio_login_challenges')
   const attempts = db.collection<{ _id: string; count: number; expiresAt: Date }>('studio_auth_attempts')
   try {
     await Promise.all([
       accounts.createIndex({ id: 1 }, { unique: true }),
       sessions.createIndex({ accountId: 1 }),
       sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-      loginChallenges.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       attempts.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ])
-    return { accounts, sessions, attempts, loginChallenges }
+    return { accounts, sessions, attempts }
   } catch (error) {
     await client.close()
     throw error

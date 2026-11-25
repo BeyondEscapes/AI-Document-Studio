@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  allowAuthAttempt, authenticate, consumeLoginChallenge, createSession, endSession, issueEmailVerification,
-  loginChallengeCookie, registerUser, startLoginChallenge, verifyAccountEmail,
+  allowAuthAttempt, authenticate, createSession, endSession, issueEmailVerification,
+  registerUser, verifyAccountEmail,
 } from '@/lib/auth'
 import { useMongoAuth } from '@/lib/mongodb-auth'
-import { sendLoginCode, sendVerificationEmail, VerificationDeliveryError, verificationMailConfig } from '@/lib/verification-email'
+import { sendVerificationEmail, VerificationDeliveryError, verificationMailConfig } from '@/lib/verification-email'
 
 const verificationResponse = () => NextResponse.json({ success: true, verificationRequired: true }, { status: 202 })
 
@@ -22,21 +22,9 @@ export async function POST(request: NextRequest) {
     const action = body?.action
     const local = ['localhost', '127.0.0.1', '[::1]'].includes(request.nextUrl.hostname)
     const secure = !local || request.nextUrl.protocol === 'https:'
-    const nonce = request.cookies.get(loginChallengeCookie)?.value
     if (action === 'logout') {
       await endSession()
-      const response = NextResponse.json({ success: true })
-      response.cookies.delete(loginChallengeCookie)
-      return response
-    }
-    if (action === 'confirm-login') {
-      const code = typeof body.code === 'string' && /^\d{6}$/.test(body.code) ? body.code : ''
-      const challenge = code && nonce ? await consumeLoginChallenge(nonce, code) : null
-      if (!challenge) return NextResponse.json({ error: 'The code is incorrect, expired, or has too many attempts.' }, { status: 400 })
-      await createSession(challenge.accountId, secure, challenge.sessionVersion)
-      const response = NextResponse.json({ success: true })
-      response.cookies.delete(loginChallengeCookie)
-      return response
+      return NextResponse.json({ success: true })
     }
     if (!['login', 'signup', 'verify-email', 'resend-verification'].includes(action)) {
       return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })
@@ -98,20 +86,8 @@ export async function POST(request: NextRequest) {
     if (account.verificationRequired && !account.accessApprovedAt) {
       return NextResponse.json({ error: 'Your email is verified. An administrator must approve workspace access before you can sign in.' }, { status: 403 })
     }
-    const mail = verificationMailConfig()
-    if (!mail) return NextResponse.json({ error: 'Sign-in email is unavailable. Contact your workspace administrator.' }, { status: 503 })
-    if (!await allowAuthAttempt(`login-mail:${email}`, 5)) {
-      return NextResponse.json({ error: 'Too many sign-in emails requested. Try again later.' }, { status: 429 })
-    }
-    stage = 'sign-in code creation'
-    const challenge = await startLoginChallenge(account, nonce)
-    stage = 'sign-in code delivery'
-    await sendLoginCode(mail, email, challenge.code)
-    const response = NextResponse.json({ success: true, loginCodeRequired: true }, { status: 202 })
-    response.cookies.set(loginChallengeCookie, challenge.nonce, {
-      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: challenge.maxAge,
-    })
-    return response
+    await createSession(account.id, secure, account.sessionVersion ?? 0)
+    return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof VerificationDeliveryError) {
       console.error('Authentication mail failed:', { stage, reason: error.reason, providerStatus: error.status })
