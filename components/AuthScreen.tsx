@@ -17,24 +17,38 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [canResend, setCanResend] = useState(false)
   const destination = destinations[currentPhoto]
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const values = Object.fromEntries(new FormData(event.currentTarget))
+    const submitter = (event.nativeEvent as SubmitEvent).submitter
+    const action = submitter?.getAttribute('value') === 'resend-verification' ? 'resend-verification' : mode
     setBusy(true)
     setError('')
+    setNotice('')
     try {
       const response = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, action: mode }),
+        body: JSON.stringify({ ...values, action }),
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error)
-      window.location.assign('/studio')
+      if (!response.ok) {
+        if (result.verificationRequired) setCanResend(true)
+        throw new Error(result.error)
+      }
+      if (result.verificationRequired) {
+        setCanResend(true)
+        setNotice('Check your inbox for the verification link. If the address already has an active account, sign in.')
+      } else {
+        window.location.assign('/studio')
+      }
     } catch (failure) {
       setError(failure instanceof Error && failure.message ? failure.message : 'Something went wrong. Try again.')
+    } finally {
       setBusy(false)
     }
   }
@@ -80,10 +94,16 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
                 {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {notice && <p className="rounded-lg bg-ui-tint px-3 py-2 text-sm text-ui-accent" role="status">{notice}</p>}
             {error && <p className="form-error" role="alert">{error}</p>}
             <button type="submit" className="primary-button auth-submit" disabled={busy}>
               {busy ? 'Please wait…' : signup ? 'Create account' : 'Sign in'} <ArrowRight size={18} />
             </button>
+            {(canResend || !signup) && (
+              <button type="submit" value="resend-verification" className="secondary-button" disabled={busy}>
+                Resend verification email
+              </button>
+            )}
           </form>
           <p className="auth-switch">
             {signup ? 'Already have an account?' : 'New to Document Studio?'}{' '}

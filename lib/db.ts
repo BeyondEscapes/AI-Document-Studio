@@ -87,6 +87,25 @@ function initSchema(db: Database.Database) {
     );
   `)
 
+  db.transaction(() => {
+    const users = db.pragma('table_info(users)') as { name: string }[]
+    const sessions = db.pragma('table_info(sessions)') as { name: string }[]
+    for (const [column, definition] of [
+      ['verification_required', 'INTEGER NOT NULL DEFAULT 0'],
+      ['email_verified_at', 'TEXT'],
+      ['access_approved_at', 'TEXT'],
+      ['verification_hash', 'TEXT'],
+      ['verification_expires_at', 'INTEGER'],
+      ['suspended_at', 'TEXT'],
+      ['session_version', 'INTEGER NOT NULL DEFAULT 0'],
+    ]) {
+      if (!users.some(field => field.name === column)) db.exec(`ALTER TABLE users ADD COLUMN ${column} ${definition}`)
+    }
+    if (!sessions.some(field => field.name === 'session_version')) {
+      db.exec('ALTER TABLE sessions ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0')
+    }
+  }).immediate()
+
   // Insert default theme if not exists
   const defaultTheme = db.prepare('SELECT id FROM themes WHERE id = ?').get('beyond-escapes-official')
   if (!defaultTheme) {

@@ -5,6 +5,10 @@ import { addItineraryOpeningPages } from '@/lib/itinerary-opening-pages'
 import { embedCatalogItineraryImages } from '@/lib/itinerary-image-storage'
 import { getTheme, getSettings } from '@/lib/db'
 import path from 'path'
+import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { DATA_DIR } from '@/lib/storage'
+import { validateWordTemplate } from '@/lib/word-template-validation'
 import type { DocumentContent } from '@/types'
 import { randomUUID } from 'node:crypto'
 import { getCurrentUser, unauthorized } from '@/lib/auth'
@@ -35,8 +39,20 @@ export async function POST(request: NextRequest) {
     let templatePath: string
     if (content.documentType === 'tour_itinerary') {
       templatePath = path.join(process.cwd(), 'assets', 'beyond-escapes-template.docx')
-    } else if (theme && require('fs').existsSync(theme.templatePath)) {
+    } else if (theme && existsSync(theme.templatePath)) {
       templatePath = theme.templatePath
+      if (!theme.isDefault) {
+        try {
+          const name = path.basename(templatePath)
+          const runtimeTemplate = path.join(DATA_DIR, 'templates', name)
+          if (!/^template_[a-f0-9-]{36}\.docx$/i.test(name) || templatePath !== runtimeTemplate) {
+            throw new Error('Invalid custom template path')
+          }
+          await validateWordTemplate(await readFile(/* turbopackIgnore: true */ runtimeTemplate))
+        } catch {
+          return NextResponse.json({ error: 'This Word template failed validation. Select another template.' }, { status: 400 })
+        }
+      }
     } else {
       // Fall back to default template
       templatePath = path.join(process.cwd(), 'assets', 'beyond-escapes-template.docx')

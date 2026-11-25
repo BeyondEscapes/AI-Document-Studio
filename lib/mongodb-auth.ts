@@ -4,6 +4,9 @@ import type { StudioUser } from './auth'
 interface Account extends StudioUser {
   _id: string
   passwordHash: string
+  verificationHash?: string
+  verificationExpiresAt?: number
+  sessionVersion?: number
 }
 
 export function useMongoAuth() {
@@ -21,11 +24,12 @@ async function connect() {
   const client = new MongoClient(uri, { maxPoolSize: 5, serverSelectionTimeoutMS: 5000 })
   const db = client.db(process.env.MONGODB_DB || 'doc_theme')
   const accounts = db.collection<Account>('studio_accounts')
-  const sessions = db.collection<{ _id: string; accountId: string; expiresAt: Date }>('studio_sessions')
+  const sessions = db.collection<{ _id: string; accountId: string; expiresAt: Date; sessionVersion?: number }>('studio_sessions')
   const attempts = db.collection<{ _id: string; count: number; expiresAt: Date }>('studio_auth_attempts')
   try {
     await Promise.all([
       accounts.createIndex({ id: 1 }, { unique: true }),
+      sessions.createIndex({ accountId: 1 }),
       sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       attempts.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ])

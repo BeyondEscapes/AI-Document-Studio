@@ -1,72 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { saveTheme } from '@/lib/db'
-import { v4 as uuidv4 } from 'uuid'
-import path from 'path'
-import fs from 'fs'
+import { randomUUID } from 'node:crypto'
+import path from 'node:path'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { DATA_DIR } from '@/lib/storage'
 import { getCurrentUser, unauthorized } from '@/lib/auth'
+import { validateWordTemplate } from '@/lib/word-template-validation'
 
 const TEMPLATES_DIR = path.join(DATA_DIR, 'templates')
 
 export async function POST(request: NextRequest) {
   try {
-    if (!await getCurrentUser()) return unauthorized()
-    const formData = await request.formData()
-    const file = formData.get('template') as File | null
-    const name = formData.get('name') as string | null
-    const description = formData.get('description') as string | null
-    
-    if (!file || !name) {
-      return NextResponse.json({ error: 'Template file and name are required' }, { status: 400 })
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
+    if (user.role !== 'admin') return NextResponse.json({ error: 'Administrator access required.' }, { status: 403 })
+
+    const formData = await request.formData().catch(() => null)
+    const file = formData?.get('template')
+    const title = formData?.get('name')
+    const notes = formData?.get('description')
+    const name = typeof title === 'string' ? title.trim().slice(0, 100) : ''
+    if (!(file instanceof File) || !name) {
+      return NextResponse.json({ error: 'Template file and name are required.' }, { status: 400 })
     }
-    
-    // Validate file type
-    if (!file.name.endsWith('.docx')) {
-      return NextResponse.json({ error: 'Only .docx files are allowed' }, { status: 400 })
-    }
-    
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File size must be less than 10MB' }, { status: 400 })
+      return NextResponse.json({ error: 'File size must be less than 10 MB.' }, { status: 413 })
     }
-    
-    // Ensure templates directory exists
-    if (!fs.existsSync(TEMPLATES_DIR)) {
-      fs.mkdirSync(TEMPLATES_DIR, { recursive: true })
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+      return NextResponse.json({ error: 'Only .docx files are allowed.' }, { status: 400 })
     }
-    
-    const themeId = uuidv4()
-    const safeFilename = `template_${themeId}.docx`
-    const templatePath = path.join(TEMPLATES_DIR, safeFilename)
-    
-    // Save file
+
     const buffer = Buffer.from(await file.arrayBuffer())
-    fs.writeFileSync(templatePath, buffer)
-    
-    // Validate it's a real DOCX (zip with word/ folder)
     try {
-      const { execSync } = require('child_process')
-      // Basic check: DOCX files start with PK (zip signature)
-      if (buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
-        fs.unlinkSync(templatePath)
-        return NextResponse.json({ error: 'Invalid DOCX file format' }, { status: 400 })
-      }
-    } catch {}
-    
-    // Save theme record
-    const theme = {
-      id: themeId,
-      name: name.substring(0, 100),
-      description: (description || '').substring(0, 500),
-      templatePath,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
+      await validateWordTemplate(buffer)
+    } catch {
+      return NextResponse.json({ error: 'Choose a valid Word template without macros, embedded objects, or external links.' }, { status: 400 })
     }
-    saveTheme(theme)
-    
-    return NextResponse.json({ success: true, theme })
+
+    const id = randomUUID()
+    const templatePath = path.join(TEMPLATES_DIR, `template_${id}.docx`)
+    const theme = { id, name, description: typeof notes === 'string' ? notes.trim().slice(0, 500) : '',
+      isDefault: false, createdAt: new Date().toISOString() }
+    await mkdir(TEMPLATES_DIR, { recursive: true })
+    try {
+      await writeFile(templatePath, buffer, { flag: 'wx' })
+      saveTheme({ ...theme, templatePath })
+    } catch (error) {
+      await rm(templatePath, { force: true }).catch(() => {})
+      throw error
+    }
+    return NextResponse.json({ success: true, theme }, { status: 201 })
   } catch (error) {
-    console.error('Upload error:', error)
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    console.error('Template upload failed:', error)
+    return NextResponse.json({ error: 'Upload failed.' }, { status: 500 })
   }
 }

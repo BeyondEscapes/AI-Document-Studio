@@ -87,6 +87,12 @@ python -m pip install python-docx lxml docx2pdf
    GEMINI_API_KEY=your_google_ai_studio_api_key
    ```
 
+### Signup verification and account access
+
+Set `RESEND_API_KEY`, `VERIFICATION_EMAIL_FROM` (an address on your verified Resend domain), and `STUDIO_PUBLIC_URL` (the public HTTPS origin) in the local or production environment. Signup requires a verification email. The user opens the link within 30 minutes and confirms the password they chose. An administrator then approves the verified account under **Admin > Accounts**.
+
+Existing accounts retain access. Administrators can suspend or reactivate members and revoke their sessions. To bootstrap a new workspace, first verify your own signup and run `npm run promote-admin -- account@example.com` (add `--mongo` for the hosted database). Treat the verification credentials as server-side secrets.
+
 ### Vercel Deployment
 
 1. In Vercel, open the project and go to **Settings > Environment Variables**.

@@ -5,7 +5,7 @@ import { getCurrentUser, unauthorized } from '@/lib/auth'
 export async function GET() {
   try {
     if (!await getCurrentUser()) return unauthorized()
-    const themes = getThemes()
+    const themes = getThemes().map(({ templatePath, ...theme }) => theme)
     return NextResponse.json({ success: true, themes })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to load themes' }, { status: 500 })

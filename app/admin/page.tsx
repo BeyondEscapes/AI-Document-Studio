@@ -1,3 +1,4 @@
+import { UserManagement } from '@/components/UserManagement'
 import { WorkspaceText } from '@/components/WorkspaceLanguage'
 import { redirect } from 'next/navigation'
 import { BadgeCheck, FileText, Users } from 'lucide-react'
@@ -5,8 +6,6 @@ import { DocumentLibrary } from '@/components/DocumentLibrary'
 import { WorkspaceHeader } from '@/components/WorkspaceHeader'
 import { listUsers, requireUser } from '@/lib/auth'
 import { listSavedDocuments } from '@/lib/conversations'
-
-const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'Asia/Colombo' })
 
 export default async function AdminPage() {
   const user = await requireUser()
@@ -45,20 +44,7 @@ export default async function AdminPage() {
           </section>
           <section aria-labelledby="team-accounts">
             <h2 id="team-accounts" className="dashboard-section-title"><WorkspaceText label="accounts" /></h2>
-            <div className="dashboard-panel table-wrap">
-              <table className="workspace-table">
-                <thead><tr><th scope="col"><WorkspaceText label="name" /></th><th scope="col"><WorkspaceText label="email" /></th><th scope="col"><WorkspaceText label="role" /></th><th scope="col"><WorkspaceText label="joined" /></th></tr></thead>
-                <tbody>{users.map(account => (
-                  <tr key={account.id}>
-                    <th scope="row">{account.name}</th><td>{account.email}</td>
-                    <td><span className={`status-pill ${account.role === 'admin' ? 'status-approved' : ''}`}>
-                      <WorkspaceText label={account.role === 'admin' ? 'administrator' : 'member'} />
-                    </span></td>
-                    <td><time dateTime={account.createdAt}>{dateFormat.format(new Date(account.createdAt))}</time></td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
+            <UserManagement accounts={users} />
           </section>
         </div>
       </main>

@@ -12,6 +12,7 @@ import type { Conversation, DocumentTheme, AppSettings } from '@/types'
 
 interface SidebarProps {
   isOpen: boolean
+  canUploadTemplates: boolean
   conversations: Conversation[]
   activeConversationId?: string
   openingId: string | null
@@ -32,7 +33,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  isOpen, conversations, activeConversationId, themes, settings, apiKeyConfigured,
+  isOpen, canUploadTemplates, conversations, activeConversationId, themes, settings, apiKeyConfigured,
   openingId, openError, onRetryOpen, onPrefetchConversation,
   selectedThemeId, onNewConversation, onSelectConversation, onDeleteConversation,
   onToggle, onSettingsUpdate, onThemeUpload, onThemeChange,
@@ -248,7 +249,7 @@ export function Sidebar({
                 ))}
 
                 {/* Upload New Template */}
-                <div className="pt-2 border-t border-ui-line mt-2">
+                {canUploadTemplates && <div className="pt-2 border-t border-ui-line mt-2">
                   <p className="text-[10px] text-ui-muted mb-1 px-1">Upload custom template</p>
                   <input
                     type="text"
@@ -279,7 +280,7 @@ export function Sidebar({
                   >
                     {uploadingTheme ? 'Uploading...' : 'Upload Template'}
                   </button>
-                </div>
+                </div>}
               </div>
             )}
           </div>
