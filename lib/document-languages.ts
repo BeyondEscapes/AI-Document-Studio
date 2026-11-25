@@ -19,3 +19,7 @@ export const DOCUMENT_REQUEST_PROMPTS: Record<DocumentLanguage, string> = {
   French: 'Veuillez décrire le document dont vous avez besoin.',
   Spanish: 'Describa el documento que necesita.',
 }
+
+export const documentLanguageTags: Record<DocumentLanguage, string> = {
+  English: 'en', Sinhala: 'si', Tamil: 'ta', German: 'de', French: 'fr', Spanish: 'es',
+}

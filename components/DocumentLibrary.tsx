@@ -1,16 +1,20 @@
 'use client'
 
+import { useWorkspaceLanguage } from './WorkspaceLanguage'
+import { documentLanguageTags } from '@/lib/document-languages'
+
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { SavedDocument } from '@/lib/db'
 
-const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'Asia/Colombo' })
 
 export function DocumentLibrary({ documents, showOwner = false }: { documents: SavedDocument[]; showOwner?: boolean }) {
   const router = useRouter()
   const dialog = useRef<HTMLDialogElement>(null)
+  const { language, t } = useWorkspaceLanguage()
+  const dateFormat = new Intl.DateTimeFormat(documentLanguageTags[language], { dateStyle: 'medium', timeZone: 'Asia/Colombo' })
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   const [selected, setSelected] = useState<SavedDocument | null>(null)
@@ -66,25 +70,25 @@ export function DocumentLibrary({ documents, showOwner = false }: { documents: S
   }
 
   return (
-    <section className="dashboard-panel" aria-label={showOwner ? 'Team documents' : 'Saved documents'}>
+    <section className="dashboard-panel" aria-label={showOwner ? t('teamDocuments') : t('savedDocuments')}>
       <div className="library-tools">
         <label className="library-search">
           <Search size={18} aria-hidden="true" />
-          <input type="search" aria-label="Search documents" placeholder="Search documents…" value={query}
+          <input type="search" aria-label={t('searchDocuments')} placeholder={t('searchDocuments')} value={query}
             onChange={event => setQuery(event.target.value)} />
         </label>
         <select aria-label="Filter approval status" value={status} onChange={event => setStatus(event.target.value)}>
-          <option value="">All statuses</option><option value="draft">Draft</option><option value="approved">Approved</option>
+          <option value="">{t('allStatuses')}</option><option value="draft">{t('draft')}</option><option value="approved">{t('approved')}</option>
         </select>
         {!showOwner && <button type="button" className="primary-button library-new" onClick={() => openDialog(null)}>
-          <Plus size={17} /> New document
+          <Plus size={17} /> {t('newDocument')}
         </button>}
       </div>
       {filtered.length ? (
         <div className="table-wrap">
           <table className="workspace-table">
-            <thead><tr><th scope="col">Document</th>{showOwner && <th scope="col">Owner</th>}<th scope="col">Status</th>
-              <th scope="col">Last updated</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th scope="col">{t('document')}</th>{showOwner && <th scope="col">{t('owner')}</th>}<th scope="col">{t('status')}</th>
+              <th scope="col">{t('updated')}</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{filtered.map(document => (
               <tr key={document.id}>
                 <th scope="row"><div className="document-cell">
@@ -94,15 +98,15 @@ export function DocumentLibrary({ documents, showOwner = false }: { documents: S
                 </div></th>
                 {showOwner && <td>{document.ownerName || 'Unassigned'}</td>}
                 <td><span className={`status-pill ${document.status === 'approved' ? 'status-approved' : ''}`}>
-                  {document.status === 'approved' ? 'Approved' : 'Draft'}
+                  {document.status === 'approved' ? t('approved') : t('draft')}
                 </span></td>
                 <td><time dateTime={document.updatedAt}>{dateFormat.format(new Date(document.updatedAt))}</time></td>
                 <td><div className="document-actions">
-                  <Link href={`/studio?document=${encodeURIComponent(document.id)}`} className="icon-button" title="Edit" aria-label={`Edit ${document.title}`}>
+                  <Link href={`/studio?document=${encodeURIComponent(document.id)}`} className="icon-button" title={t('edit')} aria-label={`${t('edit')} ${document.title}`}>
                     <Pencil size={16} />
                   </Link>
                   <button type="button" className="icon-button danger-icon" onClick={() => openDialog(document)}
-                    title="Delete" aria-label={`Delete ${document.title}`}><Trash2 size={16} /></button>
+                    title={t('delete')} aria-label={`${t('delete')} ${document.title}`}><Trash2 size={16} /></button>
                 </div></td>
               </tr>
             ))}</tbody>
@@ -111,9 +115,9 @@ export function DocumentLibrary({ documents, showOwner = false }: { documents: S
       ) : (
         <div className="library-empty">
           <span className="document-symbol"><FileText size={24} /></span>
-          <h2>{available.length ? 'No matching documents' : 'No saved documents yet'}</h2>
+          <h2>{available.length ? t('noMatchingDocuments') : t('noSavedDocuments')}</h2>
           <p>{available.length ? 'Try a different term or status.' : showOwner ? 'Team documents will appear here.' : 'Start with a blank document or create one with the studio assistant.'}</p>
-          {!available.length && !showOwner && <Link className="text-link" href="/studio">Open studio</Link>}
+          {!available.length && !showOwner && <Link className="text-link" href="/studio">{t('openStudio')}</Link>}
         </div>
       )}
       <dialog ref={dialog} className="library-dialog" aria-labelledby="document-dialog-title"
@@ -125,7 +129,7 @@ export function DocumentLibrary({ documents, showOwner = false }: { documents: S
             : <label>Document title<input name="title" maxLength={160} placeholder="Enter a title" required /></label>}
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="dialog-actions">
-            <button type="button" className="secondary-button" disabled={busy} onClick={() => dialog.current?.close()}>Cancel</button>
+            <button type="button" className="secondary-button" disabled={busy} onClick={() => dialog.current?.close()}>{t('cancel')}</button>
             <button type="submit" disabled={busy} className={selected ? 'danger-button' : 'primary-button'}>
               {busy ? 'Please wait…' : selected ? 'Delete document' : 'Open editor'}
             </button>

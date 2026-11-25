@@ -5,20 +5,22 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Files, ImageIcon, LayoutDashboard, LogOut, Sparkles } from 'lucide-react'
 import { useState } from 'react'
+import { useWorkspaceLanguage } from './WorkspaceLanguage'
 import { ThemeToggle } from './ThemeToggle'
 import { WallpaperToggle } from './WallpaperToggle'
 import { rememberStudioConversation, studioReturnHref } from '@/lib/studio-navigation'
 
 export function WorkspaceHeader({ userId, name, role }: { userId: string; name: string; role: 'member' | 'admin' }) {
+  const { t } = useWorkspaceLanguage()
   const pathname = usePathname()
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState(false)
   const entries = [
-    { href: '/studio', label: 'Studio', icon: Sparkles },
-    { href: '/documents', label: 'Documents', icon: Files },
-    { href: '/gallery', label: 'Gallery', icon: ImageIcon },
-    ...(role === 'admin' ? [{ href: '/admin', label: 'Admin', icon: LayoutDashboard }] : []),
+    { href: '/studio', label: t('studio'), icon: Sparkles },
+    { href: '/documents', label: t('documents'), icon: Files },
+    { href: '/gallery', label: t('gallery'), icon: ImageIcon },
+    ...(role === 'admin' ? [{ href: '/admin', label: t('admin'), icon: LayoutDashboard }] : []),
   ]
 
   async function signOut() {
@@ -52,7 +54,7 @@ export function WorkspaceHeader({ userId, name, role }: { userId: string; name: 
         </span>
         <span className="workspace-brand-label">Document Studio</span>
       </Link>
-      <nav className="workspace-nav" aria-label="Workspace">
+      <nav className="workspace-nav" aria-label={t('workspace')}>
         {entries.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} onNavigate={href === '/studio' ? resumeStudio : undefined}
             className="workspace-nav-link" aria-current={pathname === href ? 'page' : undefined}>

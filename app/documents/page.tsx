@@ -1,3 +1,4 @@
+import { WorkspaceText } from '@/components/WorkspaceLanguage'
 import { ChatWallpaper } from '@/components/ChatWallpaper'
 import { DocumentLibrary } from '@/components/DocumentLibrary'
 import { WorkspaceHeader } from '@/components/WorkspaceHeader'
@@ -15,8 +16,8 @@ export default async function DocumentsPage() {
           <ChatWallpaper />
           <div className="dashboard-content relative">
             <div className="dashboard-heading">
-              <h1>Saved documents</h1>
-              <p>Find, edit, and manage your drafts and approved documents.</p>
+              <h1><WorkspaceText label="savedDocuments" /></h1>
+              <p><WorkspaceText label="documentsIntro" /></p>
             </div>
             <DocumentLibrary documents={documents} />
           </div>

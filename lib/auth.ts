@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { cookies } from 'next/headers'
@@ -126,7 +127,7 @@ export async function endSession() {
   jar.delete(cookieName)
 }
 
-export async function getCurrentUser(): Promise<StudioUser | null> {
+export const getCurrentUser = cache(async (): Promise<StudioUser | null> => {
   const token = (await cookies()).get(cookieName)?.value
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null
   if (useMongoAuth()) {
@@ -140,7 +141,7 @@ export async function getCurrentUser(): Promise<StudioUser | null> {
     SELECT ${userFields} FROM sessions JOIN users ON users.id = sessions.user_id
     WHERE token_hash = ? AND expires_at > ?
   `).get(hashToken(token), Date.now()) as StudioUser | undefined ?? null
-}
+})
 
 export async function requireUser(): Promise<StudioUser> {
   const user = await getCurrentUser()

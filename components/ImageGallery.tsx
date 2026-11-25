@@ -1,5 +1,7 @@
 'use client'
 
+import { useWorkspaceLanguage } from './WorkspaceLanguage'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ChevronDown, ChevronRight, Folder, FolderPlus, ImageIcon, Pencil, Search, Upload, X } from 'lucide-react'
@@ -22,6 +24,7 @@ function folderMatch(image: ItineraryImageCatalogItem, selection: string) {
 }
 
 export function ImageGallery() {
+  const { t } = useWorkspaceLanguage()
   const [data, setData] = useState<GalleryData>()
   const [query, setQuery] = useState('')
   const [selection, setSelection] = useState('')
@@ -160,10 +163,10 @@ export function ImageGallery() {
   return (
     <div className="gallery-page">
       <header className="dashboard-heading gallery-heading">
-        <div><h1>Image gallery</h1><p>Organize and edit photos for itinerary documents.</p></div>
+        <div><h1>{t('imageGallery')}</h1><p>{t('galleryIntro')}</p></div>
         <div className="gallery-actions">
-          <button type="button" className="secondary-button" disabled={!data} onClick={() => setOrganizing(null)}><FolderPlus size={17} /> New folder</button>
-          <button type="button" className="primary-button" disabled={!data || uploading} onClick={() => upload.current?.click()}><Upload size={17} />{uploading ? 'Uploading…' : 'Upload photos'}</button>
+          <button type="button" className="secondary-button" disabled={!data} onClick={() => setOrganizing(null)}><FolderPlus size={17} /> {t('newFolder')}</button>
+          <button type="button" className="primary-button" disabled={!data || uploading} onClick={() => upload.current?.click()}><Upload size={17} />{uploading ? t('uploadingPhotos') : t('uploadPhotos')}</button>
           <input ref={upload} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event => {
             void uploadFiles(Array.from(event.currentTarget.files ?? []))
             event.currentTarget.value = ''
@@ -175,13 +178,13 @@ export function ImageGallery() {
         <button type="button" className="secondary-button button-compact" onClick={() => { setError(''); setLoadAttempt(value => value + 1) }}>Retry</button>
       )}</p>}
       {message && <p className="gallery-status" role="status">{message}</p>}
-      {!data && !error && <p role="status">Loading image library…</p>}
+      {!data && !error && <p role="status">{t('loadingPhotos')}</p>}
       {data && (
         <div className="gallery-shell">
           <aside className="gallery-sidebar" aria-label="Image folders">
-            <h2>Folders</h2>
-            <button type="button" className="gallery-folder-button" aria-pressed={!selection} onClick={() => select('')}><ImageIcon size={16} /><span>All photos</span></button>
-            <button type="button" className="gallery-folder-button" aria-pressed={selection === 'unfiled'} onClick={() => select('unfiled')}><Folder size={16} /><span>Unfiled</span></button>
+            <h2>{t('folders')}</h2>
+            <button type="button" className="gallery-folder-button" aria-pressed={!selection} onClick={() => select('')}><ImageIcon size={16} /><span>{t('allPhotos')}</span></button>
+            <button type="button" className="gallery-folder-button" aria-pressed={selection === 'unfiled'} onClick={() => select('unfiled')}><Folder size={16} /><span>{t('unfiled')}</span></button>
             <ul className="gallery-city-list">
               {cities.map(({ city, places }) => {
                 const key = city.city.toLowerCase()
@@ -224,18 +227,18 @@ export function ImageGallery() {
             }}>
             <div className="gallery-toolbar">
               <div>
-                <h2>{activeFolder ? [activeFolder.city, activeFolder.place].filter(Boolean).join(' / ') : selection ? 'Unfiled' : 'All photos'}</h2>
+                <h2>{activeFolder ? [activeFolder.city, activeFolder.place].filter(Boolean).join(' / ') : selection ? t('unfiled') : t('allPhotos')}</h2>
                 <p>{filtered.length} {filtered.length === 1 ? 'photo' : 'photos'}</p>
               </div>
               <label className="gallery-search">
                 <Search size={16} aria-hidden="true" />
-                <input type="search" aria-label="Search photos" placeholder="Search photos or locations" value={query}
+                <input type="search" aria-label={t('searchPhotos')} placeholder={t('searchPhotos')} value={query}
                   onChange={event => { setQuery(event.target.value); setLimit(PAGE_SIZE) }} />
               </label>
             </div>
             <button type="button" className="gallery-dropzone" data-dragging={dragging || undefined}
               disabled={uploading} onClick={() => upload.current?.click()}>
-              <Upload size={17} /> {uploading ? 'Uploading photos…' : 'Drop photos here or browse files'}
+              <Upload size={17} /> {uploading ? t('uploadingPhotos') : t('dropPhotos')}
             </button>
             <div className="gallery-grid">
               {filtered.slice(0, limit).map(image => (
@@ -250,15 +253,15 @@ export function ImageGallery() {
                     <h3 title={image.title}>{image.title}</h3>
                     <p>{image.width} × {image.height} px</p>
                     <div className="gallery-actions">
-                      <button type="button" className="secondary-button button-compact" onClick={() => setEditing(image)}><Pencil size={13} /> Edit</button>
-                      <button type="button" className="secondary-button button-compact" onClick={() => setOrganizing(image)}><Folder size={13} /> Organize</button>
+                      <button type="button" className="secondary-button button-compact" onClick={() => setEditing(image)}><Pencil size={13} /> {t('edit')}</button>
+                      <button type="button" className="secondary-button button-compact" onClick={() => setOrganizing(image)}><Folder size={13} /> {t('organize')}</button>
                     </div>
                   </div>
                 </article>
               ))}
             </div>
             {!filtered.length && <p className="gallery-empty">{query ? 'No photos match your search.' : 'This folder has no photos yet.'}</p>}
-            {filtered.length > limit && <button type="button" className="secondary-button gallery-more" onClick={() => setLimit(limit + PAGE_SIZE)}>Show more photos</button>}
+            {filtered.length > limit && <button type="button" className="secondary-button gallery-more" onClick={() => setLimit(limit + PAGE_SIZE)}>{t('morePhotos')}</button>}
           </section>
         </div>
       )}

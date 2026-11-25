@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel } from '@/lib/business-documents'
 import { ChatWallpaper } from './ChatWallpaper'
-import { studioText } from '@/lib/studio-text'
+import { useWorkspaceLanguage } from './WorkspaceLanguage'
 import type { Conversation, ChatMessage, DocumentContent, AppSettings } from '@/types'
 
 interface ChatPanelProps {
@@ -34,6 +34,7 @@ export function ChatPanel({
   conversation, apiKeyConfigured, selectedThemeId, settings,
   onMessageSent, onToggleDocPanel, isDocPanelOpen,
 }: ChatPanelProps) {
+  const { language, t } = useWorkspaceLanguage()
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -104,7 +105,7 @@ export function ChatPanel({
         body: JSON.stringify({
           message: text,
           conversationId: currentConvId.current,
-          language: settings?.language,
+          language,
           model: settings?.geminiModel || 'gemini-3.1-flash-lite',
           selectedThemeId,
         }),
@@ -158,7 +159,6 @@ export function ChatPanel({
     }
   }
 
-  const t = studioText(settings?.language)
   const isEmptyConversation = messages.length === 0
 
   return (

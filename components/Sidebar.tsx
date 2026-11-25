@@ -6,8 +6,8 @@ import {
   ChevronRight, FileText, Upload, Key, Check, X, AlertCircle,
   ChevronDown, ChevronUp, Palette, Loader2
 } from 'lucide-react'
-import { DOCUMENT_LANGUAGES, parseDocumentLanguage } from '@/lib/document-languages'
-import { studioText } from '@/lib/studio-text'
+import { DOCUMENT_LANGUAGES } from '@/lib/document-languages'
+import { useWorkspaceLanguage } from './WorkspaceLanguage'
 import type { Conversation, DocumentTheme, AppSettings } from '@/types'
 
 interface SidebarProps {
@@ -37,17 +37,20 @@ export function Sidebar({
   selectedThemeId, onNewConversation, onSelectConversation, onDeleteConversation,
   onToggle, onSettingsUpdate, onThemeUpload, onThemeChange,
 }: SidebarProps) {
-  const t = studioText(settings?.language)
+  const { language, setLanguage, t } = useWorkspaceLanguage()
   const [showSettings, setShowSettings] = useState(false)
   const [savingLanguage, setSavingLanguage] = useState(false)
   const [settingsError, setSettingsError] = useState('')
 
-  async function saveLanguage(language: string) {
+  async function saveLanguage(nextLanguage: typeof language) {
+    const previous = language
+    setLanguage(nextLanguage)
     setSavingLanguage(true)
     setSettingsError('')
     try {
-      await onSettingsUpdate({ language })
+      await onSettingsUpdate({ language: nextLanguage })
     } catch {
+      setLanguage(previous)
       setSettingsError(t('saveFailed'))
     } finally {
       setSavingLanguage(false)
@@ -338,9 +341,12 @@ export function Sidebar({
                   </label>
                   <select
                     id="document-language"
-                    value={parseDocumentLanguage(settings?.language) ?? 'English'}
-                    disabled={!settings || savingLanguage}
-                    onChange={event => void saveLanguage(event.target.value)}
+                    value={language}
+                    disabled={savingLanguage}
+                    onChange={event => {
+                      const choice = DOCUMENT_LANGUAGES.find(option => option === event.target.value)
+                      if (choice) void saveLanguage(choice)
+                    }}
                     className="studio-language-select w-full rounded-lg border border-ui-line px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ui-accent"
                   >
                     {DOCUMENT_LANGUAGES.map(language => <option key={language} value={language}>{language}</option>)}
