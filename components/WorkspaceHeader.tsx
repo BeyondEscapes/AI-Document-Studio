@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Files, LayoutDashboard, LogOut, Sparkles } from 'lucide-react'
+import { Files, ImageIcon, LayoutDashboard, LogOut, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { rememberStudioConversation, studioReturnHref } from '@/lib/studio-navigation'
@@ -16,6 +16,7 @@ export function WorkspaceHeader({ userId, name, role }: { userId: string; name: 
   const entries = [
     { href: '/studio', label: 'Studio', icon: Sparkles },
     { href: '/documents', label: 'Documents', icon: Files },
+    { href: '/gallery', label: 'Gallery', icon: ImageIcon },
     ...(role === 'admin' ? [{ href: '/admin', label: 'Admin', icon: LayoutDashboard }] : []),
   ]
 

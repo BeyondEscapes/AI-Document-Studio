@@ -553,3 +553,8 @@
   .workspace-account .icon-button { width: 32px; height: 32px; }
   .dashboard-metrics { grid-template-columns: 1fr; gap: 7px; }
 }
+
+@media (max-width: 400px) {
+  .workspace-header { flex-wrap: wrap; }
+  .workspace-nav { order: 1; flex: 1 0 100%; justify-content: center; }
+}

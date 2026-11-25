@@ -32,7 +32,7 @@ function tokens(value: string): string[] {
 export function scoreItineraryImage(query: string, image: ItineraryImageCatalogItem): number {
   const queryTokens = new Set(tokens(query))
   const imagePath = image.sourcePath
-  const imageTokens = [...new Set(tokens(`${imagePath} ${image.title}`))]
+  const imageTokens = [...new Set(tokens(`${imagePath} ${image.title} ${image.folder?.city ?? ''} ${image.folder?.place ?? ''}`))]
   if (!queryTokens.size || !imageTokens.length) return 0
 
   const matchedTokens = imageTokens.filter(token => queryTokens.has(token)).length

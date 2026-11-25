@@ -69,7 +69,13 @@ export interface ItineraryPageSettings {
   closing?: ItineraryClosingSettings
 }
 
+export interface ImageFolder {
+  city: string
+  place: string
+}
+
 export interface ItineraryImageCatalogItem {
+  folder?: ImageFolder
   id: string
   title: string
   sourceName: string

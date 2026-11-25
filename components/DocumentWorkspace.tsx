@@ -18,6 +18,7 @@ import {
   suggestItineraryPageImages,
   suggestItineraryImageMatches,
 } from '@/lib/itinerary-images'
+import { folderKey, imageSearchText, uniqueImageFolders } from '@/lib/image-folders'
 import { getInitialRouteStops } from '@/lib/itinerary-route'
 import { extractItinerarySections, getItineraryPageContent } from '@/lib/itinerary-page-content'
 import { applyDetailLevel, DETAIL_LEVEL_CONFIGS } from '@/lib/itinerary-detail-levels'
@@ -1901,6 +1902,10 @@ function ItineraryImagePicker({
   const query = search.trim().toLowerCase()
   const [remote, setRemote] = useState<{ query: string; images: ItineraryImageCatalogItem[] }>()
   const [limit, setLimit] = useState(24)
+  const [folder, setFolder] = useState('')
+  const folders = uniqueImageFolders(images.flatMap(image => image.folder ? [
+    { city: image.folder.city, place: '' }, image.folder,
+  ] : []))
   useEffect(() => {
     if (!query) return
     const controller = new AbortController()
@@ -1923,11 +1928,12 @@ function ItineraryImagePicker({
   }, [query])
   const localMatches = images
     .map(image => ({ image, score: query ? scoreItineraryImage(query, image) : 0 }))
-    .filter(({ image, score }) => !query || score > 0 || `${image.title} ${image.sourcePath}`.toLowerCase().includes(query))
+    .filter(({ image, score }) => !query || score > 0 || imageSearchText(image).includes(query))
     .sort((left, right) => right.score - left.score || left.image.title.localeCompare(right.image.title))
-  const filteredImages = query && remote?.query === query
-    ? remote.images
-    : localMatches.map(({ image }) => image)
+  const matches = query && remote?.query === query ? remote.images : localMatches.map(({ image }) => image)
+  const filteredImages = folder ? matches.filter(({ folder: location }) => location && (
+    folder === folderKey(location) || folder === folderKey({ city: location.city, place: '' })
+  )) : matches
 
   return (
     <div
@@ -1950,16 +1956,29 @@ function ItineraryImagePicker({
             <X size={16} />
           </button>
         </div>
-        <label className="relative m-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ui-muted" />
-          <input
-            type="search"
-            value={search}
-            onChange={event => { setLimit(24); onSearch(event.target.value) }}
-            placeholder="Search Colombo, Kandy, Sigiriya..."
-            className="w-full rounded-lg border border-ui-line py-2 pl-9 pr-3 text-xs outline-none focus:border-ui-accent"
-          />
-        </label>
+        <div className="m-3 grid gap-2 sm:grid-cols-2">
+          <label className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ui-muted" aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Search gallery photos"
+              value={search}
+              onChange={event => { setLimit(24); onSearch(event.target.value) }}
+              placeholder="Search Colombo, Kandy, Sigiriya..."
+              className="w-full rounded-lg border border-ui-line py-2 pl-9 pr-3 text-xs outline-none focus:border-ui-accent"
+            />
+          </label>
+          <select aria-label="Filter gallery photos by folder" value={folder}
+            onChange={event => { setFolder(event.target.value); setLimit(24) }}
+            className="w-full rounded-lg border border-ui-line bg-ui-panel px-3 py-2 text-xs outline-none focus:border-ui-accent">
+            <option value="">All folders</option>
+            {folders.map(location => (
+              <option key={folderKey(location)} value={folderKey(location)}>
+                {location.place ? `${location.city} / ${location.place}` : location.city}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-3 pt-0 sm:grid-cols-3">
           {filteredImages.slice(0, limit).map(image => (
             <button

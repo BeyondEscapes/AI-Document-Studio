@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { Binary, MongoClient } from 'mongodb'
-import type { ItineraryImageCatalogItem } from '../types'
+import type { ImageFolder, ItineraryImageCatalogItem } from '../types'
 
 const dimensions = 512
 const index = 'itinerary_image_metadata'
@@ -13,7 +13,7 @@ interface StoredImage extends ItineraryImageCatalogItem {
   embedding: number[]
 }
 
-function collection() {
+function database() {
   const uri = process.env.MONGODB_URI
   if (!uri) return null
   const client = clientCache.itineraryMongoClient ??= new MongoClient(uri, {
@@ -21,7 +21,11 @@ function collection() {
     connectTimeoutMS: 5000,
     serverSelectionTimeoutMS: 5000,
   })
-  return client.db(process.env.MONGODB_DB || 'doc_theme').collection<StoredImage>('itinerary_images')
+  return client.db(process.env.MONGODB_DB || 'doc_theme')
+}
+
+function collection() {
+  return database()?.collection<StoredImage>('itinerary_images')
 }
 
 function embed(value: string): number[] {
@@ -35,7 +39,7 @@ function embed(value: string): number[] {
 }
 
 function imageRecord(image: ItineraryImageCatalogItem): StoredImage {
-  return { ...image, _id: image.id, embedding: embed(`${image.title} ${image.sourcePath}`) }
+  return { ...image, _id: image.id, embedding: embed(`${image.title} ${image.sourcePath} ${image.folder?.city ?? ''} ${image.folder?.place ?? ''}`) }
 }
 
 export async function saveMongoImage(image: ItineraryImageCatalogItem, bytes: Buffer): Promise<boolean> {
@@ -47,8 +51,28 @@ export async function saveMongoImage(image: ItineraryImageCatalogItem, bytes: Bu
 
 export async function listMongoImages(): Promise<ItineraryImageCatalogItem[]> {
   return await collection()?.find<ItineraryImageCatalogItem>(
-    { bytes: { $exists: true } }, { projection: metadata },
+    { $or: [{ bytes: { $exists: true } }, { folder: { $exists: true } }] }, { projection: metadata },
   ).toArray() ?? []
+}
+
+export async function updateMongoImageMetadata(image: ItineraryImageCatalogItem): Promise<boolean> {
+  const images = collection()
+  if (!images) return false
+  const { _id, ...fields } = imageRecord(image)
+  await images.updateOne({ _id }, { $set: fields }, { upsert: true })
+  return true
+}
+
+export async function saveMongoImageFolder(folder: ImageFolder, key: string): Promise<boolean> {
+  const folders = database()?.collection<ImageFolder & { _id: string }>('itinerary_image_folders')
+  if (!folders) return false
+  await folders.updateOne({ _id: key }, { $setOnInsert: folder }, { upsert: true })
+  return true
+}
+
+export async function listMongoImageFolders(): Promise<ImageFolder[]> {
+  return await database()?.collection<ImageFolder>('itinerary_image_folders')
+    .find<ImageFolder>({}, { projection: { _id: 0 } }).toArray() ?? []
 }
 
 export async function readMongoImage(id: string): Promise<Buffer | undefined> {
