@@ -55,6 +55,9 @@
 
 .chat-canvas {
   container-type: inline-size;
+}
+
+.wallpaper-surface {
   --chat-wallpaper-ink: #23695e;
   --chat-wallpaper-opacity: .105;
   background: radial-gradient(ellipse at 18% 8%, var(--studio-accent-tint), transparent 74%), var(--studio-bg);
@@ -70,7 +73,7 @@
   pointer-events: none;
 }
 
-[data-theme="dark"] .chat-canvas {
+[data-theme="dark"] .wallpaper-surface {
   --chat-wallpaper-ink: #a4cfc8;
   --chat-wallpaper-opacity: .105;
   background: radial-gradient(ellipse at 18% 8%, #203837, transparent 74%), var(--studio-bg);

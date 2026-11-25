@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useId } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Send, FileText, RefreshCw, AlertCircle, Sparkles, ChevronRight, ExternalLink,
-  BedDouble, Bus, Camera, Compass, Mail, MapPin, Mountain, Palmtree, Plane, ReceiptText, Route, Sailboat, Ticket, Users, Waves,
+  BedDouble, Bus, Mail, ReceiptText, Route, Ticket, Users,
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel } from '@/lib/business-documents'
+import { ChatWallpaper } from './ChatWallpaper'
 import type { Conversation, ChatMessage, DocumentContent, AppSettings } from '@/types'
 
 interface ChatPanelProps {
@@ -182,7 +183,7 @@ export function ChatPanel({
       </div>
 
       {/* Messages Area */}
-      <div className="chat-canvas relative isolate min-h-0 flex-1">
+      <div className="chat-canvas wallpaper-surface relative isolate min-h-0 flex-1">
         <ChatWallpaper />
         <div className="relative h-full overflow-y-auto">
           {isEmptyConversation ? (
@@ -292,34 +293,6 @@ export function ChatPanel({
         </p>
       </div>
     </div>
-  )
-}
-
-function ChatWallpaper() {
-  const patternId = useId()
-
-  return (
-    <svg aria-hidden="true" focusable="false" className="chat-wallpaper">
-      <defs>
-        <pattern id={patternId} width="236" height="208" patternUnits="userSpaceOnUse">
-          <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-            <Plane x={20} y={25} size={25} strokeWidth={1.25} />
-            <Compass x={101} y={12} size={23} strokeWidth={1.25} />
-            <Palmtree x={183} y={32} size={26} strokeWidth={1.25} />
-            <Ticket x={60} y={68} size={23} strokeWidth={1.25} />
-            <Mountain x={143} y={77} size={27} strokeWidth={1.25} />
-            <Sailboat x={17} y={120} size={25} strokeWidth={1.25} />
-            <MapPin x={99} y={121} size={21} strokeWidth={1.25} />
-            <Camera x={197} y={126} size={23} strokeWidth={1.25} />
-            <Waves x={57} y={170} size={26} strokeWidth={1.25} />
-            <Route x={153} y={168} size={24} strokeWidth={1.25} />
-            <path d="M69 32h6m-3-3v6M129 52h6m-3-3v6M205 90h6m-3-3v6M54 143h6m-3-3v6M116 183h6m-3-3v6M21 188h6m-3-3v6" />
-            <path d="M26 80h.1M91 102h.1M165 19h.1M162 137h.1M207 181h.1M223 59h.1" strokeWidth="3" />
-          </g>
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill={`url(#${patternId})`} />
-    </svg>
   )
 }
 
