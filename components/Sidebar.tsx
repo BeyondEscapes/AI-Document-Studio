@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronUp, Palette, Loader2
 } from 'lucide-react'
 import { DOCUMENT_LANGUAGES, parseDocumentLanguage } from '@/lib/document-languages'
+import { studioText } from '@/lib/studio-text'
 import type { Conversation, DocumentTheme, AppSettings } from '@/types'
 
 interface SidebarProps {
@@ -36,6 +37,7 @@ export function Sidebar({
   selectedThemeId, onNewConversation, onSelectConversation, onDeleteConversation,
   onToggle, onSettingsUpdate, onThemeUpload, onThemeChange,
 }: SidebarProps) {
+  const t = studioText(settings?.language)
   const [showSettings, setShowSettings] = useState(false)
   const [savingLanguage, setSavingLanguage] = useState(false)
   const [settingsError, setSettingsError] = useState('')
@@ -46,7 +48,7 @@ export function Sidebar({
     try {
       await onSettingsUpdate({ language })
     } catch {
-      setSettingsError('Could not save the document language. Try again.')
+      setSettingsError(t('saveFailed'))
     } finally {
       setSavingLanguage(false)
     }
@@ -109,7 +111,7 @@ export function Sidebar({
   return (
     <div className={`flex flex-col bg-ui-panel border-r border-ui-line transition-[width] duration-300 ${isOpen ? 'w-72' : 'w-14'} flex-shrink-0`}>
       <div className={`flex h-14 shrink-0 items-center border-b border-ui-line ${isOpen ? 'justify-between px-3' : 'justify-center'}`}>
-        {isOpen && <span className="text-sm font-semibold text-ui-body">Workspace</span>}
+        {isOpen && <span className="text-sm font-semibold text-ui-body">{t('workspace')}</span>}
         <button
           type="button"
           onClick={onToggle}
@@ -125,12 +127,12 @@ export function Sidebar({
       <div className="flex justify-center p-2">
         <button
           onClick={onNewConversation}
-          aria-label="New document"
+          aria-label={t('newDocument')}
           className={`primary-button w-full ${!isOpen ? 'button-square' : ''}`}
           title="New conversation"
         >
           <MessageSquarePlus size={16} />
-          {isOpen && <span>New document</span>}
+          {isOpen && <span>{t('newDocument')}</span>}
         </button>
       </div>
 
@@ -140,7 +142,7 @@ export function Sidebar({
           <div className="flex items-start gap-1.5">
             <AlertCircle size={13} className="text-ui-warning mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs font-medium text-ui-warning">API Key Missing</p>
+              <p className="text-xs font-medium text-ui-warning">{t('apiMissing')}</p>
               <p className="text-xs text-ui-warning mt-0.5">Add GEMINI_API_KEY to .env.local</p>
             </div>
           </div>
@@ -157,8 +159,8 @@ export function Sidebar({
         {conversations.length === 0 && isOpen && (
           <div className="px-3 py-4 text-center">
             <MessageSquare size={24} className="mx-auto text-ui-muted mb-2" />
-            <p className="text-xs text-ui-muted">No conversations yet</p>
-            <p className="text-xs text-ui-muted">Start by creating a document</p>
+            <p className="text-xs text-ui-muted">{t('noConversations')}</p>
+            <p className="text-xs text-ui-muted">{t('startDocument')}</p>
           </div>
         )}
         {openError && (
@@ -216,7 +218,7 @@ export function Sidebar({
             >
               <div className="flex items-center gap-2">
                 <Palette size={14} />
-                <span className="text-xs font-medium">Templates</span>
+                <span className="text-xs font-medium">{t('templates')}</span>
               </div>
               {showThemes ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
@@ -289,7 +291,7 @@ export function Sidebar({
             >
               <div className="flex items-center gap-2">
                 <Settings size={14} />
-                <span className="text-xs font-medium">Settings</span>
+                <span className="text-xs font-medium">{t('settings')}</span>
               </div>
               {showSettings ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
@@ -299,11 +301,11 @@ export function Sidebar({
                 <div>
                   <p className="text-[10px] font-medium text-ui-muted mb-1 flex items-center gap-1">
                     <Key size={9} />
-                    API Key Status
+                    {t('apiStatus')}
                   </p>
                   <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs ${apiKeyConfigured ? 'bg-ui-tint text-ui-accent' : 'bg-ui-danger-tint text-ui-danger'}`}>
                     {apiKeyConfigured ? <Check size={10} /> : <X size={10} />}
-                    {apiKeyConfigured ? 'Gemini API key configured' : 'API key not set'}
+                    {apiKeyConfigured ? t('apiConfigured') : t('apiMissing')}
                   </div>
                   {!apiKeyConfigured && (
                     <p className="text-[10px] text-ui-muted mt-1">
@@ -313,7 +315,7 @@ export function Sidebar({
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-medium text-ui-muted mb-1">AI Model</p>
+                  <p className="text-[10px] font-medium text-ui-muted mb-1">{t('aiModel')}</p>
                   <select
                     value={settings?.geminiModel || 'gemini-3.1-flash-lite'}
                     onChange={event => {
@@ -332,7 +334,7 @@ export function Sidebar({
 
                 <div>
                   <label htmlFor="document-language" className="mb-1 block text-[10px] font-medium text-ui-muted">
-                    Default document language
+                    {t('language')}
                   </label>
                   <select
                     id="document-language"
@@ -343,7 +345,7 @@ export function Sidebar({
                   >
                     {DOCUMENT_LANGUAGES.map(language => <option key={language} value={language}>{language}</option>)}
                   </select>
-                  {savingLanguage && <p role="status" className="mt-1 text-[10px] text-ui-muted">Saving language?</p>}
+                  {savingLanguage && <p role="status" className="mt-1 text-[10px] text-ui-muted">{t('saving')}</p>}
                   {settingsError && <p role="alert" className="mt-1 text-[10px] text-ui-danger">{settingsError}</p>}
                 </div>
               </div>
@@ -354,7 +356,7 @@ export function Sidebar({
         {/* Collapsed icons */}
         {!isOpen && (
           <div className="flex flex-col items-center gap-1 p-2">
-            <button type="button" onClick={() => { onToggle(); setShowSettings(true) }} className="icon-button" aria-label="Settings" title="Settings">
+            <button type="button" onClick={() => { onToggle(); setShowSettings(true) }} className="icon-button" aria-label={t('settings')} title={t('settings')}>
               <Settings size={16} />
             </button>
           </div>

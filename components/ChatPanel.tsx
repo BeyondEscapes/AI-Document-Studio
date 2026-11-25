@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { BUSINESS_DOCUMENT_TEMPLATES, getDocumentFieldLabel } from '@/lib/business-documents'
 import { ChatWallpaper } from './ChatWallpaper'
+import { studioText } from '@/lib/studio-text'
 import type { Conversation, ChatMessage, DocumentContent, AppSettings } from '@/types'
 
 interface ChatPanelProps {
@@ -103,6 +104,7 @@ export function ChatPanel({
         body: JSON.stringify({
           message: text,
           conversationId: currentConvId.current,
+          language: settings?.language,
           model: settings?.geminiModel || 'gemini-3.1-flash-lite',
           selectedThemeId,
         }),
@@ -156,6 +158,7 @@ export function ChatPanel({
     }
   }
 
+  const t = studioText(settings?.language)
   const isEmptyConversation = messages.length === 0
 
   return (
@@ -165,7 +168,7 @@ export function ChatPanel({
         <div className="flex min-w-0 items-center gap-2">
           <Sparkles size={16} className="shrink-0 text-ui-accent" />
           <h1 className="truncate text-sm font-semibold text-ui-body">
-            {conversation?.documentContent?.title || conversation?.title || 'New document'}
+            {conversation?.documentContent?.title || conversation?.title || t('newDocument')}
           </h1>
         </div>
         <div className="ml-2 flex shrink-0 items-center gap-2">
@@ -176,7 +179,7 @@ export function ChatPanel({
               className="secondary-button button-compact"
             >
               <FileText size={13} />
-              {isDocPanelOpen ? 'Hide document' : 'View document'}
+              {isDocPanelOpen ? t('hideDocument') : t('showDocument')}
             </button>
           )}
         </div>
@@ -190,8 +193,8 @@ export function ChatPanel({
             <div className="flex min-h-full flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-9">
               <div className="chat-start-heading">
                 <span className="document-symbol"><Sparkles size={22} aria-hidden="true" /></span>
-                <h2>What would you like to create?</h2>
-                <p>Choose a document type or describe what you need in the chat.</p>
+                <h2>{t('whatToCreate')}</h2>
+                <p>{t('chooseType')}</p>
               </div>
 
               {!apiKeyConfigured && (
@@ -267,7 +270,7 @@ export function ChatPanel({
             onChange={(e) => { setInput(e.target.value); autoResizeTextarea() }}
             onKeyDown={handleKeyDown}
             aria-label="Message Document Studio"
-            placeholder="Describe the document you need…"
+            placeholder={t('describe')}
             rows={1}
             disabled={isLoading}
             className="min-w-0 flex-1 bg-transparent text-sm text-ui-body placeholder-ui-muted resize-none outline-none min-h-[36px] max-h-40 py-1 disabled:opacity-50"
@@ -277,7 +280,7 @@ export function ChatPanel({
             type="button"
             onClick={() => handleSubmit()}
             disabled={!input.trim() || isLoading || !apiKeyConfigured}
-            aria-label="Send message"
+            aria-label={t('send')}
             title="Send message"
             className="primary-button button-square shrink-0"
           >

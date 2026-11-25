@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
     conversation.messages.push(userMessage)
 
     // Generate AI response with normalized model
-    const language = parseDocumentLanguage(request.cookies.get(documentLanguageCookie(user.id))?.value)
+    const language = parseDocumentLanguage(body.language)
+      ?? parseDocumentLanguage(request.cookies.get(documentLanguageCookie(user.id))?.value)
       ?? parseDocumentLanguage(getSettings(user).language) ?? 'English'
     const result = await generateDocumentContent(message, history, normalizeModel(model), language)
     const documentIntake = result.documentIntake
