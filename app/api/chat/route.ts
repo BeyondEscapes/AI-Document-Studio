@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateDocumentContent, checkApiKey, normalizeModel } from '@/lib/gemini'
 import { getDocumentFieldLabel, getMissingRequiredFields, mergeDocumentIntakes } from '@/lib/business-documents'
 import { documentLanguageCookie, parseDocumentLanguage } from '@/lib/document-languages'
+import { extractItinerarySections } from '@/lib/itinerary-page-content'
 import { getSettings, getTheme } from '@/lib/db'
 import { saveConversation, getConversation, nextConversationUpdate } from '@/lib/conversations'
 import { v4 as uuidv4 } from 'uuid'
@@ -21,7 +22,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
+    const body = await request.json().catch(() => null)
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid chat request.' }, { status: 400 })
+    }
     const { message, conversationId, model, selectedThemeId } = body
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
@@ -75,7 +79,7 @@ export async function POST(request: NextRequest) {
     })
     const previousIntake = [...conversation.messages]
       .reverse()
-      .find(m => m.documentIntake)?.documentIntake
+      .find(m => m.documentIntake)?.documentIntake ?? existing?.documentContent?.intake
 
     // Add user message to conversation
     const userMessage: ChatMessage = {
@@ -90,35 +94,51 @@ export async function POST(request: NextRequest) {
     const language = parseDocumentLanguage(body.language)
       ?? parseDocumentLanguage(request.cookies.get(documentLanguageCookie(user.id))?.value)
       ?? parseDocumentLanguage(getSettings(user).language) ?? 'English'
-    const result = await generateDocumentContent(message, history, normalizeModel(model), language)
+    const result = await generateDocumentContent(message, history, normalizeModel(model), language, previousIntake)
     const documentIntake = result.documentIntake
       ? mergeDocumentIntakes(result.isNewDocument ? undefined : previousIntake, result.documentIntake)
       : undefined
-    const isItinerary = documentIntake?.documentType === 'tour_itinerary'
-    const missingFields = documentIntake
-      ? getMissingRequiredFields(documentIntake).filter(key =>
-          !(isItinerary && (key === 'clientName' || key === 'travelDates' || key === 'travelerCount' || key === 'tripDuration'))
-        )
-      : []
+    const missingFields = documentIntake ? getMissingRequiredFields(documentIntake) : []
     let responseText = result.message
     let documentContent = result.documentContent
 
-    if (documentIntake && missingFields.length > 0 && !documentContent && !isItinerary) {
+    if (documentIntake && missingFields.length > 0) {
       const missingLabels = missingFields
         .map(key => getDocumentFieldLabel(documentIntake.documentType, key))
       if (language === 'English') responseText = `I've identified this as a ${documentIntake.documentType.replaceAll('_', ' ')}. To prepare it accurately, could you provide these missing details: ${missingLabels.join(', ')}?`
       documentContent = null
-    } else if ((documentIntake || isItinerary) && documentContent) {
+    } else if (documentIntake && documentContent) {
       documentContent = {
         ...documentContent,
-        documentType: documentIntake?.documentType || 'tour_itinerary',
-        ...(documentIntake ? { intake: documentIntake } : {}),
+        documentType: documentIntake.documentType,
+        intake: documentIntake,
         approval: { status: 'draft' },
       }
     } else if (documentContent) {
       documentContent = {
         ...documentContent,
         approval: { status: 'draft' },
+      }
+    }
+
+    if (documentContent?.documentType === 'tour_itinerary') {
+      const extracted = extractItinerarySections(documentContent.sections)
+      const previousPages = !result.isNewDocument && existing?.documentContent?.documentType === 'tour_itinerary'
+        ? existing.documentContent.itineraryPages
+        : undefined
+      documentContent.itineraryPages = {
+        ...previousPages,
+        closing: {
+          ...previousPages?.closing,
+          quotation: extracted.quotation
+            ? { ...extracted.quotation, total: extracted.quotation.total ?? '' }
+            : previousPages?.closing?.quotation ?? { items: [], total: '' },
+          optionalEntranceFees: extracted.optionalEntranceFees ?? previousPages?.closing?.optionalEntranceFees ?? [],
+          valueAddedServices: extracted.valueAddedServices ?? previousPages?.closing?.valueAddedServices ?? [],
+          rateIncludes: extracted.rateIncludes ?? previousPages?.closing?.rateIncludes ?? [],
+          rateExcludes: extracted.rateExcludes ?? previousPages?.closing?.rateExcludes ?? [],
+          cancellationPolicy: extracted.cancellationPolicy.length ? extracted.cancellationPolicy : previousPages?.closing?.cancellationPolicy,
+        },
       }
     }
 
@@ -143,13 +163,9 @@ export async function POST(request: NextRequest) {
       conversation.title = titleText
     }
 
-    // Keep an incomplete new document from leaving a different document active in the workspace.
-    const documentCleared = Boolean(documentIntake && missingFields.length > 0 && conversation.documentContent)
-    if (documentContent) {
-      conversation.documentContent = documentContent
-    } else if (documentCleared) {
-      conversation.documentContent = undefined
-    }
+    // Hide an old preview while collecting a separate request, and retain its saved draft.
+    const documentCleared = Boolean(result.isNewDocument && missingFields.length && conversation.documentContent)
+    if (documentContent) conversation.documentContent = documentContent
     if (typeof selectedThemeId === 'string' && getTheme(selectedThemeId)) {
       conversation.selectedTheme = selectedThemeId
     }

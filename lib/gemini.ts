@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
-import { BUSINESS_DOCUMENT_TEMPLATES, normalizeDocumentIntake } from '@/lib/business-documents'
+import { BUSINESS_DOCUMENT_TEMPLATES, mergeDocumentIntakes, normalizeDocumentIntake } from '@/lib/business-documents'
 import { DOCUMENT_REQUEST_PROMPTS, parseDocumentLanguage, type DocumentLanguage } from '@/lib/document-languages'
 import type { DocumentContent, DocumentSection, DocumentIntake } from '@/types'
 
@@ -19,6 +19,7 @@ ${Object.entries(BUSINESS_DOCUMENT_TEMPLATES).map(([type, template]) => `- ${typ
 DOCUMENT RULES:
 - For a separate/new document, set isNewDocument=true and start with fresh fields; never reuse an earlier document's facts. Set isNewDocument=false for a clarification, revision, or continuation. In a continuation, merge the latest intake with corrected/new facts.
 - For document requests, return the exact supported documentType and a fields object using that template's keys. Include only facts stated by the user; use an empty string for unknown values.
+- Select the deliverable requested, such as a business letter requesting hotel information, even when its subject overlaps another template. Never ask for optional fields before drafting. Leave omitted optional fields blank.
 - If any required field is missing, set documentContent to null and ask a concise question naming the missing fields. The server independently validates these fields before generating.
 - Never invent guest identities, booking or tour references, reservation/transport confirmation status, prices, currencies, totals, tax, invoice identifiers, or travel/issue/due dates. Never calculate invoice totals. Only describe a booking or service as confirmed when the supplied status explicitly confirms it.
 - Itineraries and proposals may include suggestions, but label them as suggestions and never present them as booked services.
@@ -43,8 +44,8 @@ export const AVAILABLE_MODELS = [
 ]
 
 // Map requested model with fallback to fastest responsive flash model
-export function normalizeModel(model?: string): string {
-  if (!model || model.includes('gemini-2.0') || model.includes('gemini-1.5') || model.includes('gemini-2.5')) {
+export function normalizeModel(model?: unknown): string {
+  if (typeof model !== 'string' || !model || model.includes('gemini-2.0') || model.includes('gemini-1.5') || model.includes('gemini-2.5')) {
     return 'gemini-3.1-flash-lite'
   }
   return model
@@ -55,6 +56,7 @@ export async function generateDocumentContent(
   conversationHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
   requestedModel: string = 'gemini-3.1-flash-lite',
   language: DocumentLanguage = 'English',
+  previousIntake?: DocumentIntake,
 ): Promise<{
   message: string
   documentContent: DocumentContent | null
@@ -74,6 +76,7 @@ export async function generateDocumentContent(
 
   for (const modelToTry of modelQueue) {
     try {
+      const signal = AbortSignal.timeout(10_000)
       const chat = client.chats.create({
         model: modelToTry,
         config: {
@@ -81,47 +84,47 @@ export async function generateDocumentContent(
 
 OUTPUT LANGUAGE: The default is ${language}. Write assistant replies, clarification questions, and generated document prose, headings, and table labels in this language unless the user explicitly requests another supported language. Report the actual language in metadata.language using its English name. Use Sinhala script for Sinhala and Tamil script for Tamil. Keep JSON keys and template identifiers unchanged. Preserve names, booking references, prices, and other supplied facts. For tour itineraries, use the exact heading "Overview" for the cover overview section so the export can place it on the cover. Write the overview text in the output language.`,
           temperature: 0.2,
+          responseMimeType: 'application/json',
+          abortSignal: signal,
           maxOutputTokens: 8192,
         },
         history: conversationHistory,
       })
 
-      // Race with 8-second timeout per model to guarantee lightning-fast fallback if a model stalls
-      const sendPromise = chat.sendMessage({ message: userMessage })
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Model ${modelToTry} timed out after 8s`)), 8000)
-      )
-
-      const response = await Promise.race([sendPromise, timeoutPromise])
-      const text = response.text || ''
-
-      // Parse JSON response
-      try {
+      async function send(message: string) {
+        const response = await chat.sendMessage({ message })
+        const text = response.text ?? ''
         const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
         const parsed = JSON.parse(cleaned) as Record<string, unknown>
         const documentIntake = normalizeDocumentIntake(parsed.documentIntake)
-
         return {
           message: typeof parsed.message === 'string' ? parsed.message : DOCUMENT_REQUEST_PROMPTS[language],
           documentContent: normalizeDocumentContent(parsed.documentContent, userMessage, documentIntake, language),
           documentIntake,
           isNewDocument: parsed.isNewDocument === true,
         }
-      } catch {
-        return {
-          message: text,
-          documentContent: null,
-          documentIntake: null,
-          isNewDocument: false,
+      }
+
+      const result = await send(userMessage)
+      if (!result.documentContent && result.documentIntake) {
+        const intake = mergeDocumentIntakes(result.isNewDocument ? undefined : previousIntake, result.documentIntake)
+        if (!intake.missingFields.length) {
+          const repaired = await send('The intake already has every required field. Generate documentContent for the original request now. Leave unknown optional fields blank and keep the same document type and language.')
+          return {
+            ...repaired,
+            documentIntake: repaired.documentIntake ? mergeDocumentIntakes(intake, repaired.documentIntake) : intake,
+            isNewDocument: result.isNewDocument,
+          }
         }
       }
+      return result
     } catch (err: any) {
       lastError = err
       const status = err?.status || err?.code
       if (status === 401 || status === 403 || (Array.isArray(err?.details) && err.details.some((detail: any) => detail?.reason === 'ACCESS_TOKEN_TYPE_UNSUPPORTED'))) {
         throw new Error('Google rejected GEMINI_API_KEY. In Vercel, set it to the raw API key from Google AI Studio (not the GEMINI_API_KEY= assignment), enable it for the deployment environment, and redeploy.')
       }
-      const isTransient = status === 503 || status === 429 || status === 404 || err?.message?.includes('high demand') || err?.message?.includes('timed out')
+      const isTransient = err instanceof SyntaxError || err?.name === 'TimeoutError' || err?.name === 'AbortError' || status === 503 || status === 429 || status === 404 || err?.message?.includes('high demand') || err?.message?.includes('timed out')
       
       console.warn(`Model ${modelToTry} attempt failed (${err?.message || status}). Trying next model...`)
 

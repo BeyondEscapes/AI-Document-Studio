@@ -476,16 +476,16 @@ def add_itinerary_closing(doc, closing, content=None):
     doc.add_page_break()
 
     # 3. Quotation section
-    quotation_data = closing.get('quotation') or {}
-    raw_items = quotation_data.get('items') or []
-    if raw_items:
+    quotation_data = closing.get('quotation')
+    if quotation_data is None:
+        items = DEFAULT_QUOTATION_ITEMS
+        total = DEFAULT_QUOTATION_TOTAL
+    else:
         items = [
             (it.get('service', ''), it.get('amount', '')) if isinstance(it, dict) else (it[0], it[1])
-            for it in raw_items
+            for it in quotation_data.get('items', [])
         ]
-    else:
-        items = DEFAULT_QUOTATION_ITEMS
-    total = quotation_data.get('total') or DEFAULT_QUOTATION_TOTAL
+        total = quotation_data.get('total', DEFAULT_QUOTATION_TOTAL)
 
     q_title = doc.add_paragraph()
     q_title.paragraph_format.space_before = Pt(4)
@@ -550,14 +550,10 @@ def add_itinerary_closing(doc, closing, content=None):
         row.cells[1].width = Inches(1.8)
 
     # 4. Optional - Entrance fees
-    fees_raw = closing.get('optionalEntranceFees') or []
-    if fees_raw:
-        fee_items = [
-            (it.get('attraction', ''), it.get('amount', '')) if isinstance(it, dict) else (it[0], it[1])
-            for it in fees_raw
-        ]
-    else:
-        fee_items = DEFAULT_ENTRANCE_FEES_ITEMS
+    fee_items = [
+        (it.get('attraction', ''), it.get('amount', '')) if isinstance(it, dict) else (it[0], it[1])
+        for it in closing.get('optionalEntranceFees', DEFAULT_ENTRANCE_FEES_ITEMS)
+    ]
 
     if fee_items:
         f_title = doc.add_paragraph()
@@ -614,19 +610,19 @@ def add_itinerary_closing(doc, closing, content=None):
             para.paragraph_format.space_after = Pt(2)
 
     # 5. VALUE ADDED SERVICES ON COMPLEMENTARY BASIS
-    vas = closing.get('valueAddedServices') or DEFAULT_VALUE_ADDED_ITEMS
+    vas = closing.get('valueAddedServices', DEFAULT_VALUE_ADDED_ITEMS)
     add_closing_list('VALUE ADDED SERVICES ON COMPLEMENTARY BASIS', vas, (0x1B, 0x36, 0x5D), is_red_bullet=False)
 
     # 6. ABOVE RATE INCLUDES
-    inc = closing.get('rateIncludes') or DEFAULT_RATE_INCLUDES_ITEMS
+    inc = closing.get('rateIncludes', DEFAULT_RATE_INCLUDES_ITEMS)
     add_closing_list('ABOVE RATE INCLUDES', inc, (0x1B, 0x36, 0x5D), is_red_bullet=False)
 
     # 7. THE ABOVE RATE EXCLUDES
-    exc = closing.get('rateExcludes') or DEFAULT_RATE_EXCLUDES_ITEMS
+    exc = closing.get('rateExcludes', DEFAULT_RATE_EXCLUDES_ITEMS)
     add_closing_list('THE ABOVE RATE EXCLUDES', exc, (0x1B, 0x36, 0x5D), is_red_bullet=False)
 
     # 8. CANCELLATION POLICY
-    pol = closing.get('cancellationPolicy') or DEFAULT_CANCELLATION_POLICY_ITEMS
+    pol = closing.get('cancellationPolicy', DEFAULT_CANCELLATION_POLICY_ITEMS)
     add_closing_list('CANCELLATION POLICY', pol, (220, 38, 38), is_red_bullet=True)
 
     # 9. Company Details & Footer

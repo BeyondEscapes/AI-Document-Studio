@@ -1,8 +1,11 @@
 import path from 'path'
 import fs from 'fs'
-import { execSync } from 'child_process'
+import { execFile, execSync } from 'child_process'
+import { promisify } from 'node:util'
 import { DATA_DIR } from '@/lib/storage'
 import type { DocumentContent } from '@/types'
+
+const runPython = promisify(execFile)
 
 const PYTHON_DIR = path.join(process.cwd(), 'python')
 const EXPORTS_DIR = path.join(DATA_DIR, 'exports')
@@ -52,29 +55,18 @@ export async function generateDocx(
     }
     
     const scriptPath = path.join(PYTHON_DIR, 'generate_docx.py')
-    const cmd = `"${pythonExe}" "${scriptPath}" "${templatePath}" "${contentJsonPath}" "${outputPath}"`
-    
-    execSync(cmd, { 
-      timeout: 60000,
-      stdio: 'pipe',
-      env: { ...process.env }
-    })
+    await runPython(pythonExe, [scriptPath, templatePath, contentJsonPath, outputPath], { timeout: 60000 })
     
     if (!fs.existsSync(outputPath)) {
       return { success: false, error: 'DOCX file was not generated. Check Python script logs.' }
     }
     
-    // Cleanup temp file
-    fs.unlinkSync(contentJsonPath)
-    
     return { success: true, filePath: outputPath }
   } catch (error) {
-    // Cleanup temp file on error
-    if (fs.existsSync(contentJsonPath)) {
-      try { fs.unlinkSync(contentJsonPath) } catch {}
-    }
     const errMsg = error instanceof Error ? error.message : String(error)
     return { success: false, error: `DOCX generation failed: ${errMsg}` }
+  } finally {
+    await fs.promises.rm(contentJsonPath, { force: true }).catch(() => {})
   }
 }
 
@@ -99,12 +91,7 @@ export async function generatePdf(
   const scriptPath = path.join(PYTHON_DIR, 'convert_to_pdf.py')
 
   try {
-    const cmd = `"${pythonExe}" "${scriptPath}" "${docxPath}" "${expectedPdfPath}"`
-    execSync(cmd, {
-      timeout: 120000,
-      stdio: 'pipe',
-      env: { ...process.env },
-    })
+    await runPython(pythonExe, [scriptPath, docxPath, expectedPdfPath], { timeout: 55000 })
 
     if (fs.existsSync(expectedPdfPath) && fs.statSync(expectedPdfPath).size > 0) {
       return { success: true, filePath: expectedPdfPath }

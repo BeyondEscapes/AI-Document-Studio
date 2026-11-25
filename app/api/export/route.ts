@@ -13,11 +13,12 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
     if (!user) return unauthorized()
-    const body = await request.json()
-    const { documentContent, themeId, format, filename } = body
+    const body = await request.json().catch(() => null)
+    const { documentContent, themeId, format, filename } = body ?? {}
 
-    if (!documentContent) {
-      return NextResponse.json({ error: 'Document content is required' }, { status: 400 })
+    if (!documentContent || typeof documentContent.title !== 'string' || !Array.isArray(documentContent.sections) ||
+      documentContent.sections.some((section: unknown) => !section || typeof section !== 'object')) {
+      return NextResponse.json({ error: 'Valid document content is required.' }, { status: 400 })
     }
 
     if (!['docx', 'pdf'].includes(format)) {
@@ -138,9 +139,10 @@ export async function POST(request: NextRequest) {
     const pdfResult = await generatePdf(docxResult.filePath, storageName(pdfFilename))
     
     if (!pdfResult.success) {
+      console.error('PDF conversion failed:', pdfResult.error)
       return NextResponse.json(
         { 
-          error: pdfResult.error || 'PDF conversion failed',
+          error: 'Server PDF conversion failed. Use Save as PDF in your browser or download the Word document.',
           browserPdfAvailable: true,
           docxAvailable: true,
           docxFilename,

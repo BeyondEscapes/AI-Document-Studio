@@ -3,7 +3,8 @@
     "name": "ai-document-studio",
     "version": "1.0.0",
     "scripts": {
-        "lint": "next lint",
+        "typecheck": "tsc --noEmit --incremental false",
+        "test:smoke": "node scripts/smoke-test.mjs",
         "build": "node scripts/copy-maplibre-worker.mjs && next build",
         "dev": "node scripts/copy-maplibre-worker.mjs && next dev",
         "start": "next start",
