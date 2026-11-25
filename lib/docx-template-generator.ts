@@ -724,8 +724,8 @@ function itineraryClosingElements(document: XmlDocument, closing: ItineraryClosi
   }))
 
   const quotationData = closing.quotation ?? DEFAULT_QUOTATION
-  const qItems = quotationData.items?.length ? quotationData.items : DEFAULT_QUOTATION.items
-  const qTotal = quotationData.total || DEFAULT_QUOTATION.total
+  const qItems = quotationData.items
+  const qTotal = quotationData.total ?? DEFAULT_QUOTATION.total
 
   const qRows = qItems.map(it => [it.service, it.amount])
   if (qTotal) {
@@ -740,7 +740,7 @@ function itineraryClosingElements(document: XmlDocument, closing: ItineraryClosi
   }, 'F2F4F7', '111827'))
 
   // 4. Optional Entrance Fees
-  const feeItems = closing.optionalEntranceFees?.length ? closing.optionalEntranceFees : DEFAULT_ENTRANCE_FEES
+  const feeItems = closing.optionalEntranceFees ?? DEFAULT_ENTRANCE_FEES
   if (feeItems.length) {
     elements.push(createParagraph(document, 'Optional - Entrance fees', {
       bold: true,
@@ -778,19 +778,19 @@ function itineraryClosingElements(document: XmlDocument, closing: ItineraryClosi
   }
 
   // 5. VALUE ADDED SERVICES
-  const vas = closing.valueAddedServices?.length ? closing.valueAddedServices : DEFAULT_VALUE_ADDED_SERVICES
+  const vas = closing.valueAddedServices ?? DEFAULT_VALUE_ADDED_SERVICES
   addListSection('VALUE ADDED SERVICES ON COMPLEMENTARY BASIS', vas)
 
   // 6. ABOVE RATE INCLUDES
-  const inc = closing.rateIncludes?.length ? closing.rateIncludes : DEFAULT_RATE_INCLUDES
+  const inc = closing.rateIncludes ?? DEFAULT_RATE_INCLUDES
   addListSection('ABOVE RATE INCLUDES', inc)
 
   // 7. THE ABOVE RATE EXCLUDES
-  const exc = closing.rateExcludes?.length ? closing.rateExcludes : DEFAULT_RATE_EXCLUDES
+  const exc = closing.rateExcludes ?? DEFAULT_RATE_EXCLUDES
   addListSection('THE ABOVE RATE EXCLUDES', exc)
 
   // 8. CANCELLATION POLICY
-  const pol = closing.cancellationPolicy?.length ? closing.cancellationPolicy : DEFAULT_CANCELLATION_POLICY
+  const pol = closing.cancellationPolicy ?? DEFAULT_CANCELLATION_POLICY
   addListSection('CANCELLATION POLICY', pol, true)
 
   // 9. Company Details & Footer

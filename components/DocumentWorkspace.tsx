@@ -1476,7 +1476,6 @@ function ItineraryPagesEditor({
 }) {
   const pageContent = getItineraryPageContent(documentContent)
   const cover = documentContent.itineraryPages?.cover ?? {}
-  const closing = documentContent.itineraryPages?.closing ?? {}
   const fields = documentContent.intake?.fields ?? {}
   const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim() || ''
   const routeStops = cover.routeStops ?? getInitialRouteStops(routeText)
@@ -1484,8 +1483,140 @@ function ItineraryPagesEditor({
   return (
     <section className="space-y-3 rounded-xl border border-ui-line bg-ui-tint/40 p-3">
       <div>
-        <h3 className="text-xs font-semibold text-ui-accent">Cover & final page editor</h3>
-        <p className="text-[10px] text-ui-accent">These fields stay editable in Word. Artwork and maps are images only.</p>
+        <h3 className="text-xs font-semibold text-ui-accent">Itinerary fields</h3>
+        <p className="text-[10px] text-ui-accent">Edit the quotation, closing terms, and cover details.</p>
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-ui-line bg-ui-panel p-3">
+        <h4 className="text-[11px] font-semibold text-ui-body">Quotation &amp; Closing Page</h4>
+
+        {/* Quotation Editor */}
+        <div className="space-y-2 rounded border border-ui-line bg-ui-canvas/50 p-2">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-semibold text-ui-muted">Quotation (one per line: Service | Amount)</span>
+            <ClosingLinesField
+              value={pageContent.quotation.items.map(it => `${it.service} | ${it.amount}`).join('\n')}
+              onChange={value => {
+                const items = value.split(/\r?\n/).map(line => {
+                  const parts = line.split(/[|\t]/)
+                  return { service: parts[0]?.trim() || '', amount: parts[1]?.trim() || '' }
+                }).filter(it => it.service || it.amount)
+                onClosingPageUpdate({
+                  quotation: {
+                    items,
+                    total: pageContent.quotation.total,
+                  },
+                })
+              }}
+              rows={3}
+              className="w-full resize-y rounded-lg border border-ui-line bg-ui-panel px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
+              placeholder="Per vehicle per tour | USD 760.00"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-0.5 block text-[9px] font-medium text-ui-muted">Total Amount</span>
+            <input
+              value={pageContent.quotation.total}
+              onChange={event => onClosingPageUpdate({
+                quotation: {
+                  items: pageContent.quotation.items,
+                  total: event.target.value,
+                },
+              })}
+              className="w-full rounded-lg border border-ui-line bg-ui-panel px-2 py-1 text-xs text-ui-body outline-none focus:border-ui-accent"
+              placeholder="USD 920.00"
+            />
+          </label>
+        </div>
+
+        {/* Optional Entrance Fees */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Optional - Entrance fees (one per line: Attraction | Amount)</span>
+          <ClosingLinesField
+            value={pageContent.optionalEntranceFees.map(it => `${it.attraction} | ${it.amount}`).join('\n')}
+            onChange={value => onClosingPageUpdate({
+              optionalEntranceFees: value.split(/\r?\n/).map(line => {
+                const parts = line.split(/[|\t]/)
+                return { attraction: parts[0]?.trim() || '', amount: parts[1]?.trim() || '' }
+              }).filter(it => it.attraction || it.amount),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
+            placeholder="Dambulla Cave Temple | USD 10.00"
+          />
+        </label>
+
+        {/* Value Added Services */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Value added services on complementary basis (one item per line)</span>
+          <ClosingLinesField
+            value={pageContent.valueAddedServices.join('\n')}
+            onChange={value => onClosingPageUpdate({
+              valueAddedServices: value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={3}
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
+          />
+        </label>
+
+        {/* Above Rate Includes */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Above rate includes (one item per line)</span>
+          <ClosingLinesField
+            value={pageContent.rateIncludes.join('\n')}
+            onChange={value => onClosingPageUpdate({
+              rateIncludes: value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
+          />
+        </label>
+
+        {/* The Above Rate Excludes */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">The above rate excludes (one item per line)</span>
+          <ClosingLinesField
+            value={pageContent.rateExcludes.join('\n')}
+            onChange={value => onClosingPageUpdate({
+              rateExcludes: value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
+          />
+        </label>
+
+        {/* Cancellation Policy */}
+        <label className="block">
+          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Cancellation policy (one term per line)</span>
+          <ClosingLinesField
+            value={pageContent.cancellationPolicy.join('\n')}
+            onChange={value => onClosingPageUpdate({
+              cancellationPolicy: value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
+            })}
+            rows={4}
+            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
+          />
+        </label>
+
+        {/* Company Contact Details */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {([
+            ['companyName', 'Company name', pageContent.companyName],
+            ['phone', 'Phone', pageContent.phone],
+            ['email', 'Email / website', pageContent.email],
+            ['address', 'Address', pageContent.address],
+          ] as const).map(([key, label, value]) => (
+            <label key={key} className="block">
+              <span className="mb-1 block text-[10px] font-medium text-ui-muted">{label}</span>
+              <textarea
+                value={value}
+                onChange={event => onClosingPageUpdate({ [key]: event.target.value })}
+                rows={key === 'address' ? 2 : 1}
+                className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
+              />
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-2 rounded-lg border border-ui-line bg-ui-panel p-3">
@@ -1535,137 +1666,33 @@ function ItineraryPagesEditor({
           </label>
         )}
       </div>
-
-      <div className="space-y-3 rounded-lg border border-ui-line bg-ui-panel p-3">
-        <h4 className="text-[11px] font-semibold text-ui-body">Quotation &amp; Closing Page</h4>
-
-        {/* Quotation Editor */}
-        <div className="space-y-2 rounded border border-ui-line bg-ui-canvas/50 p-2">
-          <span className="block text-[10px] font-semibold text-ui-muted">Quotation (one per line: Service | Amount)</span>
-          <textarea
-            value={pageContent.quotation.items.map(it => `${it.service} | ${it.amount}`).join('\n')}
-            onChange={event => {
-              const items = event.target.value.split(/\r?\n/).map(line => {
-                const parts = line.split(/[|\t]/)
-                return { service: parts[0]?.trim() || '', amount: parts[1]?.trim() || '' }
-              }).filter(it => it.service || it.amount)
-              onClosingPageUpdate({
-                quotation: {
-                  items,
-                  total: closing.quotation?.total ?? pageContent.quotation.total,
-                },
-              })
-            }}
-            rows={3}
-            className="w-full resize-y rounded-lg border border-ui-line bg-ui-panel px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
-            placeholder="Per vehicle per tour | USD 760.00"
-          />
-          <label className="block">
-            <span className="mb-0.5 block text-[9px] font-medium text-ui-muted">Total Amount</span>
-            <input
-              value={closing.quotation?.total ?? pageContent.quotation.total}
-              onChange={event => onClosingPageUpdate({
-                quotation: {
-                  items: closing.quotation?.items ?? pageContent.quotation.items,
-                  total: event.target.value,
-                },
-              })}
-              className="w-full rounded-lg border border-ui-line bg-ui-panel px-2 py-1 text-xs text-ui-body outline-none focus:border-ui-accent"
-              placeholder="USD 920.00"
-            />
-          </label>
-        </div>
-
-        {/* Optional Entrance Fees */}
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Optional - Entrance fees (one per line: Attraction | Amount)</span>
-          <textarea
-            value={pageContent.optionalEntranceFees.map(it => `${it.attraction} | ${it.amount}`).join('\n')}
-            onChange={event => onClosingPageUpdate({
-              optionalEntranceFees: event.target.value.split(/\r?\n/).map(line => {
-                const parts = line.split(/[|\t]/)
-                return { attraction: parts[0]?.trim() || '', amount: parts[1]?.trim() || '' }
-              }).filter(it => it.attraction || it.amount),
-            })}
-            rows={4}
-            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
-            placeholder="Dambulla Cave Temple | USD 10.00"
-          />
-        </label>
-
-        {/* Value Added Services */}
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Value added services on complementary basis (one item per line)</span>
-          <textarea
-            value={pageContent.valueAddedServices.join('\n')}
-            onChange={event => onClosingPageUpdate({
-              valueAddedServices: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
-            })}
-            rows={3}
-            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
-          />
-        </label>
-
-        {/* Above Rate Includes */}
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Above rate includes (one item per line)</span>
-          <textarea
-            value={pageContent.rateIncludes.join('\n')}
-            onChange={event => onClosingPageUpdate({
-              rateIncludes: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
-            })}
-            rows={4}
-            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
-          />
-        </label>
-
-        {/* The Above Rate Excludes */}
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-ui-muted">The above rate excludes (one item per line)</span>
-          <textarea
-            value={pageContent.rateExcludes.join('\n')}
-            onChange={event => onClosingPageUpdate({
-              rateExcludes: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
-            })}
-            rows={4}
-            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
-          />
-        </label>
-
-        {/* Cancellation Policy */}
-        <label className="block">
-          <span className="mb-1 block text-[10px] font-medium text-ui-muted">Cancellation policy (one term per line)</span>
-          <textarea
-            value={pageContent.cancellationPolicy.join('\n')}
-            onChange={event => onClosingPageUpdate({
-              cancellationPolicy: event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean),
-            })}
-            rows={4}
-            className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
-          />
-        </label>
-
-        {/* Company Contact Details */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {([
-            ['companyName', 'Company name', pageContent.companyName],
-            ['phone', 'Phone', pageContent.phone],
-            ['email', 'Email / website', pageContent.email],
-            ['address', 'Address', pageContent.address],
-          ] as const).map(([key, label, value]) => (
-            <label key={key} className="block">
-              <span className="mb-1 block text-[10px] font-medium text-ui-muted">{label}</span>
-              <textarea
-                value={value}
-                onChange={event => onClosingPageUpdate({ [key]: event.target.value })}
-                rows={key === 'address' ? 2 : 1}
-                className="w-full resize-y rounded-lg border border-ui-line px-2 py-1.5 text-xs text-ui-body outline-none focus:border-ui-accent"
-              />
-            </label>
-          ))}
-        </div>
-      </div>
     </section>
+  )
+}
+
+function ClosingLinesField({
+  value,
+  onChange,
+  ...props
+}: {
+  value: string
+  onChange: (value: string) => void
+  rows: number
+  className: string
+  placeholder?: string
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  return (
+    <textarea
+      {...props}
+      value={draft ?? value}
+      onChange={event => {
+        setDraft(event.target.value)
+        onChange(event.target.value)
+      }}
+      onBlur={() => setDraft(null)}
+    />
   )
 }
 

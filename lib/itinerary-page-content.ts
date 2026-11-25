@@ -263,41 +263,22 @@ export function getItineraryPageContent(content: DocumentContent): ItineraryPage
   const fields = content.intake?.fields ?? {}
   const routeText = fields.destinations?.trim() || fields.route?.trim() || fields.travelRoute?.trim()
 
-  const quotation = closing.quotation?.items?.length
-    ? { items: closing.quotation.items, total: closing.quotation.total || DEFAULT_QUOTATION.total }
-    : (extracted.quotation?.items?.length
-      ? { items: extracted.quotation.items, total: extracted.quotation.total || DEFAULT_QUOTATION.total }
-      : DEFAULT_QUOTATION)
+  const quotation = closing.quotation
+    ? { items: closing.quotation.items, total: closing.quotation.total ?? DEFAULT_QUOTATION.total }
+    : extracted.quotation?.items.length
+      ? { items: extracted.quotation.items, total: extracted.quotation.total ?? DEFAULT_QUOTATION.total }
+      : DEFAULT_QUOTATION
 
-  const optionalEntranceFees = closing.optionalEntranceFees?.length
-    ? closing.optionalEntranceFees
-    : (extracted.optionalEntranceFees?.length
-      ? extracted.optionalEntranceFees
-      : DEFAULT_ENTRANCE_FEES)
-
-  const valueAddedServices = closing.valueAddedServices?.length
-    ? closing.valueAddedServices
-    : (extracted.valueAddedServices?.length
-      ? extracted.valueAddedServices
-      : DEFAULT_VALUE_ADDED_SERVICES)
-
-  const rateIncludes = closing.rateIncludes?.length
-    ? closing.rateIncludes
-    : (extracted.rateIncludes?.length
-      ? extracted.rateIncludes
-      : DEFAULT_RATE_INCLUDES)
-
-  const rateExcludes = closing.rateExcludes?.length
-    ? closing.rateExcludes
-    : (extracted.rateExcludes?.length
-      ? extracted.rateExcludes
-      : DEFAULT_RATE_EXCLUDES)
-
-  const cancellationPolicy = closing.cancellationPolicy?.length
-    ? closing.cancellationPolicy
-    : (extracted.cancellationPolicy.length
-      ? extracted.cancellationPolicy
-      : DEFAULT_CANCELLATION_POLICY)
+  const optionalEntranceFees = closing.optionalEntranceFees
+    ?? (extracted.optionalEntranceFees?.length ? extracted.optionalEntranceFees : DEFAULT_ENTRANCE_FEES)
+  const valueAddedServices = closing.valueAddedServices
+    ?? (extracted.valueAddedServices?.length ? extracted.valueAddedServices : DEFAULT_VALUE_ADDED_SERVICES)
+  const rateIncludes = closing.rateIncludes
+    ?? (extracted.rateIncludes?.length ? extracted.rateIncludes : DEFAULT_RATE_INCLUDES)
+  const rateExcludes = closing.rateExcludes
+    ?? (extracted.rateExcludes?.length ? extracted.rateExcludes : DEFAULT_RATE_EXCLUDES)
+  const cancellationPolicy = closing.cancellationPolicy
+    ?? (extracted.cancellationPolicy.length ? extracted.cancellationPolicy : DEFAULT_CANCELLATION_POLICY)
 
   return {
     overview: settings.cover?.overview
